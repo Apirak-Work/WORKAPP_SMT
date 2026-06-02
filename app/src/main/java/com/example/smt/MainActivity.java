@@ -7,8 +7,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -35,11 +33,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String DATAWEDGE_ACTION = "com.symbol.datawedge.data";
     private static final String DATAWEDGE_EXTRA_DATA_STRING = "com.symbol.datawedge.data_string";
     private static final String LEGACY_DATAWEDGE_EXTRA_DATA_STRING = "com.motorolasolutions.emdk.datawedge.data_string";
-    private static final long SCANNER_AUTO_SUBMIT_DELAY_MS = 350L;
-
     private final StringBuilder scanBuffer = new StringBuilder();
-    private final Handler scannerHandler = new Handler(Looper.getMainLooper());
-    private final Runnable autoSubmitFocusedScanField = this::submitFocusedScanFieldIfValid;
     private final BroadcastReceiver dataWedgeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -95,6 +89,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         bindViews();
+        preventInitialKeyboard();
         viewModel = new ViewModelProvider(this).get(ScanViewModel.class);
         viewModel.getUiState().observe(this, this::render);
         wireActions();
@@ -228,32 +223,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void configureScanInput(EditText editText, ScanViewModel.CurrentScanState targetState) {
-        editText.setShowSoftInputOnFocus(false);
         editText.setSelectAllOnFocus(false);
-        editText.setOnClickListener(v -> requestFieldFocus(editText));
-        editText.setOnLongClickListener(v -> {
-            editText.setShowSoftInputOnFocus(true);
-            editText.requestFocus();
-            editText.post(() -> {
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
-                }
-            });
-            return true;
-        });
-        editText.addTextChangedListener(new SimpleTextWatcher() {
-            @Override
-            public void afterTextChanged(Editable editable) {
-                if (!editText.hasFocus()) {
-                    return;
-                }
-                scannerHandler.removeCallbacks(autoSubmitFocusedScanField);
-                if (viewModel.isValueValidForState(targetState, editable.toString())) {
-                    scannerHandler.postDelayed(autoSubmitFocusedScanField, SCANNER_AUTO_SUBMIT_DELAY_MS);
-                }
-            }
-        });
+    }
+
+    private void preventInitialKeyboard() {
+        View root = findViewById(R.id.main);
+        if (root != null) {
+            root.setFocusableInTouchMode(true);
+            root.requestFocus();
+        }
+        hideKeyboard();
+    }
+
+    private void hideKeyboard() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        View currentFocus = getCurrentFocus();
+        if (imm != null && currentFocus != null) {
+            imm.hideSoftInputFromWindow(currentFocus.getWindowToken(), 0);
+        }
     }
 
     private boolean handleScanEditorAction(
@@ -324,31 +311,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void focusForScanState(ScanViewModel.UiState state) {
-        if (state.productionVisible || state.scanState == lastFocusedScanState) {
-            return;
-        }
-
         lastFocusedScanState = state.scanState;
-        switch (state.scanState) {
-            case USER:
-                requestFieldFocus(userIdInput);
-                break;
-            case MACHINE:
-                requestFieldFocus(machineInput);
-                break;
-            case RUNCARD:
-                requestFieldFocus(runcardInput);
-                break;
-            case COMPLETE:
-                verifyButton.requestFocus();
-                break;
-            default:
-                break;
-        }
     }
 
     private void requestFieldFocus(EditText editText) {
-        editText.setShowSoftInputOnFocus(false);
         editText.requestFocus();
         editText.setSelection(editText.getText().length());
     }
@@ -617,18 +583,6 @@ public class MainActivity extends AppCompatActivity {
         } else {
             input.setText("");
             input.setError("Invalid " + labelForState(targetState));
-            viewModel.submitScanValue(targetState, value);
-        }
-    }
-
-    private void submitFocusedScanFieldIfValid() {
-        ScanViewModel.CurrentScanState targetState = focusedScanState();
-        if (targetState == null) {
-            return;
-        }
-        EditText input = getScanInput(targetState);
-        String value = input.getText().toString();
-        if (viewModel.isValueValidForState(targetState, value)) {
             viewModel.submitScanValue(targetState, value);
         }
     }

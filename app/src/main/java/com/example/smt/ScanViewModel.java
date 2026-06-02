@@ -183,11 +183,10 @@ public class ScanViewModel extends ViewModel {
                 runcard = value;
                 scanState = CurrentScanState.COMPLETE;
                 step = WorkflowStep.VERIFY;
-                scannerMessage = "Checking backend and validating scan data...";
-                verifyReady = false;
-                verifyButtonText = "CHECKING BACKEND...";
+                scannerMessage = "All scan data captured. Review, then press Verify.";
+                verifyReady = true;
+                verifyButtonText = "VERIFY";
                 scanValidated = false;
-                loadProductionData(value);
                 break;
             default:
                 break;
@@ -233,8 +232,8 @@ public class ScanViewModel extends ViewModel {
             return;
         }
 
-        step = WorkflowStep.INPUT_QTY;
-        ensureStartTimestampForStatus("KIT PULL GENERATION");
+        scannerMessage = "Loading production data from backend...";
+        loadProductionData(runcard);
         publish(false, false);
     }
 
@@ -296,11 +295,10 @@ public class ScanViewModel extends ViewModel {
             step = WorkflowStep.VERIFY;
             if (scanValidated) {
                 scannerMessage = "Runcard data loaded and scan validated. Review before confirming";
-                if (!verifyCountdownRunning && !verifyReady) {
-                    startVerifyCountdown();
-                }
             } else if (!productionDataLoading && productionDataError.isEmpty()) {
-                scannerMessage = "Checking backend and validating scan data...";
+                scannerMessage = "All scan data captured. Review, then press Verify.";
+                verifyReady = true;
+                verifyButtonText = "VERIFY";
             }
         }
     }
@@ -365,6 +363,8 @@ public class ScanViewModel extends ViewModel {
         productionDataError = "";
         productionDetail = null;
         operRows = new ArrayList<>();
+        verifyReady = false;
+        verifyButtonText = "LOADING...";
         publish(false, false);
 
         productionRepository.loadProductionData(userId, machineId, runcardNo, new ProductionRepository.ProductionDataCallback() {
@@ -380,8 +380,11 @@ public class ScanViewModel extends ViewModel {
                 scanValidated = validation != null && validation.allowed;
                 if (scanValidated) {
                     productionDataError = "";
-                    scannerMessage = "Backend connected. Scan data validated.";
-                    startVerifyCountdown();
+                    scannerMessage = "Backend connected. Production data loaded.";
+                    verifyReady = true;
+                    verifyButtonText = "VERIFIED";
+                    step = WorkflowStep.INPUT_QTY;
+                    ensureStartTimestampForStatus("KIT PULL GENERATION");
                 } else {
                     productionDataError = validationErrorMessage(validation);
                     scannerMessage = productionDataError;
@@ -463,9 +466,8 @@ public class ScanViewModel extends ViewModel {
         return verifyReady
                 && !verifyCountdownRunning
                 && hasScanSet()
-                && scanValidated
-                && productionDetail != null
-                && productionDataError.isEmpty();
+                && !productionDataLoading
+                && !scanValidated;
     }
 
     private boolean canSave() {
@@ -563,9 +565,7 @@ public class ScanViewModel extends ViewModel {
     private void publish(boolean accessDeniedEvent, boolean saveCompleteEvent) {
         boolean productionVisible = step == WorkflowStep.INPUT_QTY
                 || step == WorkflowStep.SUMMARY
-                || productionDataLoading
-                || productionDetail != null
-                || !productionDataError.isEmpty();
+                || productionDetail != null;
         boolean qtyComplete = isQtyComplete();
         boolean canSave = canSave();
         uiState.postValue(new UiState(

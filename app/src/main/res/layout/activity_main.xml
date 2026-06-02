@@ -167,7 +167,7 @@
                     android:scrollbars="horizontal">
 
                     <LinearLayout
-                        android:id="@+id/operRowsTable"
+                        android:id="@+id/productionDetailTable"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
@@ -568,6 +568,7 @@
                     android:scrollbars="horizontal">
 
                     <LinearLayout
+                        android:id="@+id/operRowsTable"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="vertical">

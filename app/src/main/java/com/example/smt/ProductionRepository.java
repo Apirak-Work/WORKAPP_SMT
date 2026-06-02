@@ -1,8 +1,5 @@
 package com.example.smt;
 
-import android.os.Handler;
-import android.os.Looper;
-
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +21,6 @@ final class ProductionRepository {
         void onError(String message);
     }
 
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ProductionApiClient apiClient = new ProductionApiClient(ApiConfig.BASE_URLS);
 
@@ -38,14 +34,10 @@ final class ProductionRepository {
             try {
                 ProductionDetail detail = apiClient.getProductionDetail(runcardNo);
                 List<OperTrackingRow> operRows = apiClient.getOperTracking(runcardNo);
-                ProductionApiClient.ValidateScanResult validation =
-                        apiClient.validateScan(userId, machineId, runcardNo);
-                mainHandler.post(() -> callback.onSuccess(detail, operRows, validation));
+                ProductionApiClient.ValidateScanResult validation = apiClient.validateScan(userId, machineId, runcardNo);
+                callback.onSuccess(detail, operRows, validation);
             } catch (Exception e) {
-                String message = e.getMessage() == null
-                        ? "Unable to load production data"
-                        : e.getMessage();
-                mainHandler.post(() -> callback.onError(message));
+                callback.onError(e.getMessage() == null ? "Unable to load production data" : e.getMessage());
             }
         });
     }
@@ -73,12 +65,9 @@ final class ProductionRepository {
                         finishDateMillis,
                         postingDateMillis
                 );
-                mainHandler.post(() -> callback.onSuccess(result));
+                callback.onSuccess(result);
             } catch (Exception e) {
-                String message = e.getMessage() == null
-                        ? "Unable to save production data"
-                        : e.getMessage();
-                mainHandler.post(() -> callback.onError(message));
+                callback.onError(e.getMessage() == null ? "Unable to save production data" : e.getMessage());
             }
         });
     }
