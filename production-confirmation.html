@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Production Confirmation MES</title>
+    <link rel="stylesheet" href="production-confirmation.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Smart Manufacturing Execution System</p>
+          <h1>Production Confirmation</h1>
+        </div>
+        <div class="system-pill">
+          <span class="pulse-dot"></span>
+          GEN2 / ST1 / G2 Mobile
+        </div>
+      </header>
+
+      <section class="phase phase-scan" aria-labelledby="scan-title">
+        <div class="phase-header">
+          <span class="phase-number">01</span>
+          <div>
+            <h2 id="scan-title">Unified Smart Scanning</h2>
+            <p>One scan box routes operator, machine, and runcard automatically.</p>
+          </div>
+        </div>
+
+        <label class="scan-field" for="smartScan">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h2v2h-2a.5.5 0 0 0-.5.5v2H3v-2Zm13.5-2.5h2A2.5 2.5 0 0 1 21 5.5v2h-2v-2a.5.5 0 0 0-.5-.5h-2V3ZM5 16.5v2a.5.5 0 0 0 .5.5h2v2h-2A2.5 2.5 0 0 1 3 18.5v-2h2Zm14 0h2v2a2.5 2.5 0 0 1-2.5 2.5h-2v-2h2a.5.5 0 0 0 .5-.5v-2ZM7 8h1.5v8H7V8Zm3 0h3v8h-3V8Zm4.5 0H16v8h-1.5V8Z" />
+          </svg>
+          <span>
+            <strong>Smart Scan Input</strong>
+            <input id="smartScan" autocomplete="off" placeholder="Scan USER-2048, MC-ICS09107, or RC-S5UBT200102" />
+          </span>
+        </label>
+
+        <div class="status-grid" aria-label="Scan status">
+          <article class="status-card" id="operatorCard">
+            <span class="status-icon">OK</span>
+            <div>
+              <p>Operator</p>
+              <strong id="operatorValue">Pending</strong>
+            </div>
+          </article>
+          <article class="status-card" id="machineCard">
+            <span class="status-icon">OK</span>
+            <div>
+              <p>Machine</p>
+              <strong id="machineValue">Pending</strong>
+            </div>
+          </article>
+          <article class="status-card" id="runcardCard">
+            <span class="status-icon">OK</span>
+            <div>
+              <p>Runcard</p>
+              <strong id="runcardValue">Pending</strong>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="phase phase-verify" aria-labelledby="verify-title">
+        <div class="phase-header">
+          <span class="phase-number">02</span>
+          <div>
+            <h2 id="verify-title">Data Matching & Safety Interlock</h2>
+            <p>Verify identity, machine, and runcard route before operations unlock.</p>
+          </div>
+        </div>
+
+        <div class="verify-panel">
+          <button class="verify-button" id="verifyBtn" disabled>
+            <span class="ring" id="verifyRing">3</span>
+            VERIFY & MATCH DATA
+          </button>
+          <div class="match-state" id="matchState">Waiting for all three scans</div>
+        </div>
+
+        <div class="alert-card" id="deniedAlert" hidden>
+          <strong>ACCESS DENIED / CREDENTIALS MISMATCH</strong>
+          <span>Operator, machine, or runcard is not authorized for this workcenter.</span>
+        </div>
+      </section>
+
+      <section class="phase phase-ops is-locked" id="opsPhase" aria-labelledby="ops-title">
+        <div class="phase-header">
+          <span class="phase-number">03</span>
+          <div>
+            <h2 id="ops-title">Mode Operations & Production Input</h2>
+            <p>Unlocked after successful verification.</p>
+          </div>
+        </div>
+
+        <div class="mode-tabs" role="tablist" aria-label="Operation mode">
+          <button class="active" type="button">Check Runcard</button>
+          <button type="button">Split Lot</button>
+          <button type="button">Merge/Combine</button>
+        </div>
+
+        <div class="data-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>OPER</th>
+                <th>WC</th>
+                <th>Description</th>
+                <th>Yield</th>
+                <th>Scrap</th>
+                <th>Receive Date</th>
+                <th>Confirm Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>0210</td>
+                <td>ICS01203</td>
+                <td>Production Labor Test Bill</td>
+                <td>0</td>
+                <td>0</td>
+                <td>not receive</td>
+                <td>not confirm</td>
+              </tr>
+              <tr>
+                <td>0220</td>
+                <td>ICS09106</td>
+                <td>2D Inspection</td>
+                <td>0</td>
+                <td>0</td>
+                <td>not receive</td>
+                <td>not confirm</td>
+              </tr>
+              <tr class="current-row">
+                <td>0240</td>
+                <td>ICS09107</td>
+                <td>3D Inspection</td>
+                <td>100</td>
+                <td>0</td>
+                <td>27 May 2026 09:42</td>
+                <td>ready</td>
+              </tr>
+              <tr>
+                <td>0250</td>
+                <td>ICS09105</td>
+                <td>Packing-FVI</td>
+                <td>0</td>
+                <td>0</td>
+                <td>not receive</td>
+                <td>not confirm</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="input-area">
+          <div class="quantity-grid">
+            <label>
+              <span>GOOD QTY</span>
+              <input id="goodQty" type="number" min="0" inputmode="numeric" placeholder="0" />
+            </label>
+            <label>
+              <span>SCRAP QTY</span>
+              <input id="scrapQty" type="number" min="0" inputmode="numeric" placeholder="0" />
+            </label>
+            <label>
+              <span>Downtime</span>
+              <input type="number" min="0" inputmode="numeric" value="0" />
+              <em>min.</em>
+            </label>
+            <label>
+              <span>Setup Time</span>
+              <input type="number" min="0" inputmode="numeric" value="12" />
+              <em>min.</em>
+            </label>
+          </div>
+
+          <div class="time-grid">
+            <article>
+              <span>START DATE</span>
+              <strong>27 May 2026 09:35:10</strong>
+              <small>Kit Pull Generation</small>
+            </article>
+            <article>
+              <span>FINISH DATE</span>
+              <strong id="finishDate">Pending Summary</strong>
+              <small>Auto from handheld</small>
+            </article>
+            <article>
+              <span>POSTING DATE</span>
+              <strong id="postingDate">Pending Summary</strong>
+              <small>Auto from handheld</small>
+            </article>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <div class="process-counters">
+            <span>Labor Time: <strong>28 min.</strong></span>
+            <span>M/C Time: <strong>31 min.</strong></span>
+            <span>%Yield: <strong id="yieldPercent">---</strong></span>
+          </div>
+          <button class="save-button" id="saveBtn" disabled>
+            <span id="saveCountdown">3</span>
+            SAVE CONFIRM
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <script src="production-confirmation.js"></script>
+  </body>
+</html>

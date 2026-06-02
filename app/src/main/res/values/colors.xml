@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="industrial_bg">#F4F7F8</color>
+    <color name="panel_bg">#FFFFFFFF</color>
+    <color name="text_primary">#172024</color>
+    <color name="text_secondary">#5C6B73</color>
+    <color name="teal_active">#00A99D</color>
+    <color name="teal_dark">#007A72</color>
+    <color name="warning">#FFB020</color>
+    <color name="danger">#D92D20</color>
+    <color name="line_muted">#CAD4D8</color>
+    <color name="info_cell_bg">#FBFCFC</color>
+    <color name="link_blue">#0078D4</color>
+</resources>
