@@ -237,6 +237,37 @@ public class ScanViewModel extends ViewModel {
         publish(false, false);
     }
 
+    void switchRuncardAndVerify(String rawRuncard) {
+        String value = normalize(rawRuncard);
+        if (!isValidForState(CurrentScanState.RUNCARD, value)) {
+            scannerMessage = "Invalid Runcard selected. Scan " + hintForState(CurrentScanState.RUNCARD);
+            publish(false, false);
+            return;
+        }
+
+        cancelTimer(verifyTimer);
+        cancelTimer(saveTimer);
+        runcard = value;
+        scanState = CurrentScanState.COMPLETE;
+        step = WorkflowStep.VERIFY;
+        scannerMessage = "Runcard changed to " + value + ". Loading production data...";
+        verifyButtonText = "LOADING...";
+        verifyCountdownRunning = false;
+        verifyReady = false;
+        scanValidated = false;
+        saveCountdownRunning = false;
+        saveButtonText = "SAVE CONFIRM";
+        goodQty = "";
+        scrapQty = "";
+        finishDateMillis = 0L;
+        postingDateMillis = 0L;
+        productionDataError = "";
+        productionDetail = null;
+        operRows = new ArrayList<>();
+        loadProductionData(runcard);
+        publish(false, false);
+    }
+
     void setGoodQty(String value) {
         goodQty = normalize(value);
         publish(false, false);

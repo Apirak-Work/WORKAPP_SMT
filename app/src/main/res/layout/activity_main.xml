@@ -159,6 +159,7 @@
                     android:textStyle="bold" />
 
                 <HorizontalScrollView
+                    android:id="@+id/productionDetailSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -501,6 +502,7 @@
                 </HorizontalScrollView>
 
                 <HorizontalScrollView
+                    android:id="@+id/modeButtonsSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
@@ -550,22 +552,28 @@
                     </LinearLayout>
                 </HorizontalScrollView>
 
-                <TextView
+                <LinearLayout
+                    android:id="@+id/operTrackingSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="OPER TRACKING"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:orientation="vertical">
 
-                <HorizontalScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:fillViewport="false"
-                    android:overScrollMode="ifContentScrolls"
-                    android:scrollbars="horizontal">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="OPER TRACKING"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fillViewport="false"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="horizontal">
 
                     <LinearLayout
                         android:id="@+id/operRowsTable"
@@ -826,9 +834,145 @@
                                 android:text="-" />
                         </LinearLayout>
                     </LinearLayout>
-                </HorizontalScrollView>
+                    </HorizontalScrollView>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/checkRuncardPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_info_cell"
+                    android:orientation="vertical"
+                    android:padding="10dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/checkRuncardTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="OVERVIEW RUNCARD by WO"
+                                android:textColor="@color/text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/checkRuncardSubtitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="WO: -"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <Button
+                            android:id="@+id/closeCheckRuncardButton"
+                            android:layout_width="82dp"
+                            android:layout_height="34dp"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:padding="0dp"
+                            android:text="Close"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <ProgressBar
+                        android:id="@+id/checkRuncardProgress"
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="10dp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/checkRuncardMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:text="Loading Runcards..."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fillViewport="false"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="76dp"
+                                    android:text="TYPE" />
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="132dp"
+                                    android:text="RC" />
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="160dp"
+                                    android:text="ASSY" />
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="72dp"
+                                    android:text="QTY" />
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="102dp"
+                                    android:text="RC ACTION" />
+
+                                <TextView
+                                    style="@style/OperHeaderCell"
+                                    android:layout_width="132dp"
+                                    android:text="STATUS" />
+                            </LinearLayout>
+
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/checkRuncardRecyclerView"
+                                android:layout_width="674dp"
+                                android:layout_height="260dp"
+                                android:overScrollMode="ifContentScrolls"
+                                android:scrollbars="vertical" />
+                        </LinearLayout>
+                    </HorizontalScrollView>
+                </LinearLayout>
 
                 <TextView
+                    android:id="@+id/goodQtyLabel"
                     style="@style/WorkflowLabel"
                     android:layout_marginTop="12dp"
                     android:text="Good QTY" />
@@ -844,6 +988,7 @@
                     android:textSize="20sp" />
 
                 <TextView
+                    android:id="@+id/scrapQtyLabel"
                     style="@style/WorkflowLabel"
                     android:layout_marginTop="8dp"
                     android:text="Scrap QTY" />

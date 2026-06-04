@@ -21,6 +21,12 @@ final class ProductionRepository {
         void onError(String message);
     }
 
+    interface RuncardOverviewCallback {
+        void onSuccess(List<RuncardOverviewRow> rows);
+
+        void onError(String message);
+    }
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ProductionApiClient apiClient = new ProductionApiClient(ApiConfig.BASE_URLS);
 
@@ -68,6 +74,16 @@ final class ProductionRepository {
                 callback.onSuccess(result);
             } catch (Exception e) {
                 callback.onError(e.getMessage() == null ? "Unable to save production data" : e.getMessage());
+            }
+        });
+    }
+
+    void loadRuncardsByWorkOrder(String workOrderNo, RuncardOverviewCallback callback) {
+        executor.execute(() -> {
+            try {
+                callback.onSuccess(apiClient.getRuncardsByWorkOrder(workOrderNo));
+            } catch (Exception e) {
+                callback.onError(e.getMessage() == null ? "Unable to load runcards by WO" : e.getMessage());
             }
         });
     }

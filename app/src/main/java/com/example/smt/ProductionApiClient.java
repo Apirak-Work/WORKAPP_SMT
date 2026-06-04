@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.URLEncoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -65,6 +67,23 @@ final class ProductionApiClient {
                     opt(json, "receiveDate"),
                     opt(json, "confirmDate"),
                     opt(json, "en")
+            ));
+        }
+        return rows;
+    }
+
+    List<RuncardOverviewRow> getRuncardsByWorkOrder(String workOrderNo) throws IOException, JSONException {
+        JSONArray array = new JSONArray(get("/api/production/workorders/" + urlSegment(workOrderNo) + "/runcards"));
+        List<RuncardOverviewRow> rows = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject json = array.getJSONObject(i);
+            rows.add(new RuncardOverviewRow(
+                    opt(json, "type"),
+                    opt(json, "rc"),
+                    opt(json, "assy"),
+                    opt(json, "qty"),
+                    opt(json, "rcAction"),
+                    opt(json, "status")
             ));
         }
         return rows;
@@ -213,7 +232,14 @@ final class ProductionApiClient {
     }
 
     private static String urlSegment(String value) {
-        return value == null ? "" : value.trim().replace(" ", "%20");
+        if (value == null) {
+            return "";
+        }
+        try {
+            return URLEncoder.encode(value.trim(), "UTF-8").replace("+", "%20");
+        } catch (UnsupportedEncodingException ignored) {
+            return value.trim().replace(" ", "%20");
+        }
     }
 
     private static String isoDate(long millis) {

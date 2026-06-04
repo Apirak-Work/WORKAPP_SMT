@@ -43,6 +43,14 @@ public sealed record OperTrackingRow(
     DateTimeOffset? ConfirmDate,
     string? En);
 
+public sealed record RuncardOverviewRow(
+    string? Type,
+    string? Rc,
+    string? Assy,
+    string? Qty,
+    string? RcAction,
+    string? Status);
+
 public sealed record SaveProductionRequest(
     string UserId,
     string MachineId,

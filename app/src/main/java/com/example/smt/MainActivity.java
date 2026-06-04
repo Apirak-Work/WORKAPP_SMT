@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -17,6 +18,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,9 +29,18 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final String CHECK_RUNCARD_LOG = "CheckRuncardDebug";
     private static final String DATAWEDGE_ACTION = "com.symbol.datawedge.data";
     private static final String DATAWEDGE_EXTRA_DATA_STRING = "com.symbol.datawedge.data_string";
     private static final String LEGACY_DATAWEDGE_EXTRA_DATA_STRING = "com.motorolasolutions.emdk.datawedge.data_string";
@@ -68,14 +79,30 @@ public class MainActivity extends AppCompatActivity {
     private TextView operPercentYieldValue;
     private TextView summaryPostingDateValue;
     private TextView summaryConfirmDateValue;
+    private View productionDetailSection;
+    private View modeButtonsSection;
+    private LinearLayout operTrackingSection;
     private LinearLayout operRowsTable;
+    private LinearLayout checkRuncardPanel;
+    private RecyclerView checkRuncardRecyclerView;
+    private TextView checkRuncardSubtitle;
+    private TextView checkRuncardMessage;
+    private ProgressBar checkRuncardProgress;
     private LinearLayout productionPanel;
     private Button verifyButton;
     private Button saveButton;
     private Button summaryButton;
+    private Button checkRuncardButton;
+    private Button closeCheckRuncardButton;
+    private TextView goodQtyLabel;
+    private TextView scrapQtyLabel;
     private EditText goodQtyInput;
     private EditText scrapQtyInput;
     private ScanViewModel.CurrentScanState lastFocusedScanState;
+    private final ProductionRetrofitApi retrofitApi = RetrofitProvider.productionApi();
+    private RuncardOverviewAdapter checkRuncardAdapter;
+    private Call<List<RuncardOverviewModel>> checkRuncardCall;
+    private String activeCheckRuncardWorkOrder = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +134,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         unregisterReceiver(dataWedgeReceiver);
+        if (checkRuncardCall != null) {
+            checkRuncardCall.cancel();
+        }
         super.onDestroy();
     }
 
@@ -173,11 +203,23 @@ public class MainActivity extends AppCompatActivity {
         operPercentYieldValue = findViewById(R.id.operPercentYieldValue);
         summaryPostingDateValue = findViewById(R.id.summaryPostingDateValue);
         summaryConfirmDateValue = findViewById(R.id.summaryConfirmDateValue);
+        productionDetailSection = findViewById(R.id.productionDetailSection);
+        modeButtonsSection = findViewById(R.id.modeButtonsSection);
+        operTrackingSection = findViewById(R.id.operTrackingSection);
         operRowsTable = findViewById(R.id.operRowsTable);
+        checkRuncardPanel = findViewById(R.id.checkRuncardPanel);
+        checkRuncardRecyclerView = findViewById(R.id.checkRuncardRecyclerView);
+        checkRuncardSubtitle = findViewById(R.id.checkRuncardSubtitle);
+        checkRuncardMessage = findViewById(R.id.checkRuncardMessage);
+        checkRuncardProgress = findViewById(R.id.checkRuncardProgress);
         productionPanel = findViewById(R.id.productionPanel);
         verifyButton = findViewById(R.id.verifyButton);
         saveButton = findViewById(R.id.saveButton);
         summaryButton = findViewById(R.id.summaryButton);
+        checkRuncardButton = findViewById(R.id.checkRuncardButton);
+        closeCheckRuncardButton = findViewById(R.id.closeCheckRuncardButton);
+        goodQtyLabel = findViewById(R.id.goodQtyLabel);
+        scrapQtyLabel = findViewById(R.id.scrapQtyLabel);
         goodQtyInput = findViewById(R.id.goodQtyInput);
         scrapQtyInput = findViewById(R.id.scrapQtyInput);
     }
@@ -196,6 +238,11 @@ public class MainActivity extends AppCompatActivity {
         verifyButton.setOnClickListener(v -> viewModel.verifyAndProceed());
         summaryButton.setOnClickListener(v -> viewModel.enterSummary());
         saveButton.setOnClickListener(v -> viewModel.requestSave());
+        checkRuncardButton.setOnClickListener(v -> openCheckRuncardByWorkOrder());
+        closeCheckRuncardButton.setOnClickListener(v -> closeCheckRuncardByWorkOrder());
+        checkRuncardAdapter = new RuncardOverviewAdapter(this::selectRuncardFromOverview);
+        checkRuncardRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        checkRuncardRecyclerView.setAdapter(checkRuncardAdapter);
 
         configureScanInput(userIdInput, ScanViewModel.CurrentScanState.USER);
         configureScanInput(machineInput, ScanViewModel.CurrentScanState.MACHINE);
@@ -279,6 +326,15 @@ public class MainActivity extends AppCompatActivity {
         verifyButton.setEnabled(state.verifyEnabled);
 
         productionPanel.setVisibility(state.productionVisible ? View.VISIBLE : View.GONE);
+        if (!state.productionVisible) {
+            closeCheckRuncardByWorkOrder();
+        }
+        String currentWorkOrder = state.productionDetail == null ? "" : displayOrDash(state.productionDetail.workOrder);
+        if (checkRuncardPanel.getVisibility() == View.VISIBLE
+                && !activeCheckRuncardWorkOrder.isEmpty()
+                && !activeCheckRuncardWorkOrder.equals(currentWorkOrder)) {
+            closeCheckRuncardByWorkOrder();
+        }
         summaryButton.setEnabled(state.step == ScanViewModel.WorkflowStep.INPUT_QTY);
         saveButton.setText(state.saveButtonText);
         saveButton.setEnabled(state.saveEnabled);
@@ -414,6 +470,158 @@ public class MainActivity extends AppCompatActivity {
         for (OperTrackingRow row : state.operRows) {
             operRowsTable.addView(createOperRow(row, row == activeRow));
         }
+    }
+
+    private void openCheckRuncardByWorkOrder() {
+        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+        ProductionDetail detail = state == null ? null : state.productionDetail;
+        String workOrderNo = detail == null ? "" : displayOrDash(detail.workOrder);
+        if (workOrderNo.equals("-")) {
+            Toast.makeText(this, "Work Order is not loaded yet", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        activeCheckRuncardWorkOrder = workOrderNo;
+        toggleCheckRuncardView(true);
+        checkRuncardSubtitle.setText("WO: " + workOrderNo);
+        checkRuncardProgress.setVisibility(View.VISIBLE);
+        checkRuncardMessage.setVisibility(View.VISIBLE);
+        checkRuncardMessage.setText("Loading Runcards from database...");
+        clearCheckRuncardRows();
+
+        if (checkRuncardCall != null) {
+            checkRuncardCall.cancel();
+        }
+        checkRuncardCall = retrofitApi.getRuncardsByWorkOrder(workOrderNo);
+        checkRuncardCall.enqueue(new Callback<List<RuncardOverviewModel>>() {
+            @Override
+            public void onResponse(
+                    Call<List<RuncardOverviewModel>> call,
+                    Response<List<RuncardOverviewModel>> response
+            ) {
+                if (!workOrderNo.equals(activeCheckRuncardWorkOrder)) {
+                    return;
+                }
+                checkRuncardProgress.setVisibility(View.GONE);
+                if (response.isSuccessful()) {
+                    Log.d(CHECK_RUNCARD_LOG, "WO " + workOrderNo + " parsed rows: "
+                            + (response.body() == null ? 0 : response.body().size()));
+                    renderCheckRuncardRows(response.body());
+                    return;
+                }
+                Log.d(CHECK_RUNCARD_LOG, "WO " + workOrderNo + " failed HTTP " + response.code());
+                checkRuncardMessage.setVisibility(View.VISIBLE);
+                checkRuncardMessage.setText("Load failed: HTTP " + response.code());
+            }
+
+            @Override
+            public void onFailure(Call<List<RuncardOverviewModel>> call, Throwable throwable) {
+                if (call.isCanceled() || !workOrderNo.equals(activeCheckRuncardWorkOrder)) {
+                    return;
+                }
+                checkRuncardProgress.setVisibility(View.GONE);
+                Log.d(CHECK_RUNCARD_LOG, "WO " + workOrderNo + " request failed", throwable);
+                checkRuncardMessage.setVisibility(View.VISIBLE);
+                checkRuncardMessage.setText("Load failed: " + (throwable.getMessage() == null
+                        ? "Unable to load Runcards"
+                        : throwable.getMessage()));
+            }
+        });
+    }
+
+    private void closeCheckRuncardByWorkOrder() {
+        activeCheckRuncardWorkOrder = "";
+        if (checkRuncardCall != null) {
+            checkRuncardCall.cancel();
+            checkRuncardCall = null;
+        }
+        toggleCheckRuncardView(false);
+        if (checkRuncardProgress != null) {
+            checkRuncardProgress.setVisibility(View.GONE);
+        }
+        if (checkRuncardMessage != null) {
+            checkRuncardMessage.setVisibility(View.GONE);
+        }
+        clearCheckRuncardRows();
+    }
+
+    private void toggleCheckRuncardView(boolean show) {
+        int checkVisibility = show ? View.VISIBLE : View.GONE;
+        int standardVisibility = show ? View.GONE : View.VISIBLE;
+
+        if (checkRuncardPanel != null) {
+            checkRuncardPanel.setVisibility(checkVisibility);
+        }
+        if (productionDetailSection != null) {
+            productionDetailSection.setVisibility(standardVisibility);
+        }
+        if (modeButtonsSection != null) {
+            modeButtonsSection.setVisibility(standardVisibility);
+        }
+        if (operTrackingSection != null) {
+            operTrackingSection.setVisibility(standardVisibility);
+        }
+        if (goodQtyLabel != null) {
+            goodQtyLabel.setVisibility(standardVisibility);
+        }
+        if (goodQtyInput != null) {
+            goodQtyInput.setVisibility(standardVisibility);
+        }
+        if (scrapQtyLabel != null) {
+            scrapQtyLabel.setVisibility(standardVisibility);
+        }
+        if (scrapQtyInput != null) {
+            scrapQtyInput.setVisibility(standardVisibility);
+        }
+        if (timestampValue != null) {
+            timestampValue.setVisibility(standardVisibility);
+        }
+        if (summaryButton != null) {
+            summaryButton.setVisibility(standardVisibility);
+        }
+        if (saveButton != null) {
+            saveButton.setVisibility(standardVisibility);
+        }
+    }
+
+    private void clearCheckRuncardRows() {
+        if (checkRuncardAdapter != null) {
+            checkRuncardAdapter.clear();
+        }
+    }
+
+    private void renderCheckRuncardRows(List<RuncardOverviewModel> rows) {
+        clearCheckRuncardRows();
+        if (rows == null || rows.isEmpty()) {
+            checkRuncardMessage.setVisibility(View.VISIBLE);
+            checkRuncardMessage.setText("No Runcards found for WO " + activeCheckRuncardWorkOrder);
+            return;
+        }
+        checkRuncardMessage.setVisibility(View.GONE);
+        for (int i = 0; i < rows.size(); i++) {
+            RuncardOverviewModel row = rows.get(i);
+            Log.d(CHECK_RUNCARD_LOG, "row " + i
+                    + " type=" + row.getType()
+                    + ", rc=" + row.getRuncardNo()
+                    + ", assy=" + row.getAssy()
+                    + ", qty=" + row.getQty()
+                    + ", rcAction=" + row.getRcAction()
+                    + ", status=" + row.getStatus());
+        }
+        checkRuncardAdapter.submitRows(rows);
+    }
+
+    private void selectRuncardFromOverview(String selectedRuncard) {
+        String nextRuncard = cleanScanValue(selectedRuncard);
+        if (nextRuncard.isEmpty() || "-".equals(nextRuncard)) {
+            Toast.makeText(this, "Runcard number is empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        setTextIfDifferent(runcardInput, nextRuncard);
+        closeCheckRuncardByWorkOrder();
+        viewModel.switchRuncardAndVerify(nextRuncard);
+        hideKeyboard();
     }
 
     private View createOperPlaceholderRow(String message) {

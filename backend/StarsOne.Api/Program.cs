@@ -61,6 +61,15 @@ app.MapGet("/api/production/runcards/{runcardNo}/opers", async (
     return Results.Ok(opers);
 });
 
+app.MapGet("/api/production/workorders/{workOrderNo}/runcards", async (
+    string workOrderNo,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var runcards = await repository.GetRuncardsByWorkOrderAsync(workOrderNo, cancellationToken);
+    return Results.Ok(runcards);
+});
+
 app.MapPost("/api/production/save", async (
     [FromBody] SaveProductionRequest request,
     ProductionRepository repository,

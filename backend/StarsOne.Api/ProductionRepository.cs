@@ -119,6 +119,31 @@ public sealed class ProductionRepository
         return rows;
     }
 
+    public async Task<IReadOnlyList<RuncardOverviewRow>> GetRuncardsByWorkOrderAsync(
+        string workOrderNo,
+        CancellationToken cancellationToken)
+    {
+        var rows = new List<RuncardOverviewRow>();
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(_queries.Get("GetRuncardsByWorkOrder"), connection);
+        command.Parameters.AddWithValue("@WorkOrderNo", workOrderNo);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new RuncardOverviewRow(
+                ReadString(reader, "Type"),
+                ReadString(reader, "Rc"),
+                ReadString(reader, "Assy"),
+                ReadString(reader, "Qty"),
+                ReadString(reader, "RcAction"),
+                ReadString(reader, "Status")));
+        }
+
+        return rows;
+    }
+
     public async Task<SaveProductionResponse> SaveProductionAsync(
         SaveProductionRequest request,
         CancellationToken cancellationToken)
