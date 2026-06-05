@@ -32,6 +32,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import retrofit2.Call;
@@ -103,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
     private RuncardOverviewAdapter checkRuncardAdapter;
     private Call<List<RuncardOverviewModel>> checkRuncardCall;
     private String activeCheckRuncardWorkOrder = "";
+    private HoldFunctionManager holdFunctionManager;
+    private final List<ActionButtonModule> actionButtonModules = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -240,6 +243,8 @@ public class MainActivity extends AppCompatActivity {
         saveButton.setOnClickListener(v -> viewModel.requestSave());
         checkRuncardButton.setOnClickListener(v -> openCheckRuncardByWorkOrder());
         closeCheckRuncardButton.setOnClickListener(v -> closeCheckRuncardByWorkOrder());
+        initializeHoldFunctionManager();
+        initializePlaceholderActionManagers();
         checkRuncardAdapter = new RuncardOverviewAdapter(this::selectRuncardFromOverview);
         checkRuncardRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         checkRuncardRecyclerView.setAdapter(checkRuncardAdapter);
@@ -267,6 +272,112 @@ public class MainActivity extends AppCompatActivity {
                 viewModel.setScrapQty(editable.toString());
             }
         });
+    }
+
+    private void initializeHoldFunctionManager() {
+        View[] standardWorkflowViews = {
+                productionDetailSection,
+                modeButtonsSection,
+                operTrackingSection,
+                goodQtyLabel,
+                goodQtyInput,
+                scrapQtyLabel,
+                scrapQtyInput,
+                timestampValue,
+                summaryButton,
+                saveButton
+        };
+
+        holdFunctionManager = new HoldFunctionManager(
+                this,
+                findViewById(R.id.layoutHoldFunction),
+                findViewById(R.id.holdButton),
+                standardWorkflowViews,
+                new HoldFunctionManager.Callback() {
+                    @Override
+                    public ProductionDetail getCurrentProductionDetail() {
+                        return currentProductionDetail();
+                    }
+
+                    @Override
+                    public void onOpenRequested() {
+                        closeCheckRuncardByWorkOrder();
+                    }
+
+                    @Override
+                    public void onClosed() {
+                        // Reserved for refreshing shared state after the HOLD panel is dismissed.
+                    }
+
+                    @Override
+                    public void onHoldActionSucceeded(String actionType) {
+                        ProductionDetail detail = currentProductionDetail();
+                        if (detail != null && !TextUtils.isEmpty(detail.runcardNo)) {
+                            viewModel.switchRuncardAndVerify(detail.runcardNo);
+                        }
+                    }
+                }
+        );
+        holdFunctionManager.initialize();
+    }
+
+    private void initializePlaceholderActionManagers() {
+        actionButtonModules.clear();
+        actionButtonModules.add(new CheckB2bManager(
+                this,
+                findViewById(R.id.checkB2bButton),
+                this::currentProductionDetail
+        ));
+        actionButtonModules.add(new HoldForIrrManager(
+                this,
+                findViewById(R.id.holdForIrrButton),
+                this::currentProductionDetail
+        ));
+        actionButtonModules.add(new SplitMergeManager(
+                this,
+                findViewById(R.id.splitButton),
+                findViewById(R.id.mergeButton),
+                new SplitMergeManager.CallbackBridge() {
+                    @Override
+                    public ProductionDetail getCurrentProductionDetail() {
+                        return currentProductionDetail();
+                    }
+
+                    @Override
+                    public String getCurrentWorkCenter() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.wc);
+                    }
+
+                    @Override
+                    public String getCurrentUserId() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        return state == null ? "" : state.userId;
+                    }
+
+                    @Override
+                    public void onSplitSucceeded(String newRuncard) {
+                        if (!TextUtils.isEmpty(newRuncard)) {
+                            viewModel.switchRuncardAndVerify(newRuncard);
+                        }
+                    }
+                }
+        ));
+        actionButtonModules.add(new TestFunctionManager(
+                this,
+                findViewById(R.id.testButton),
+                this::currentProductionDetail
+        ));
+
+        for (ActionButtonModule module : actionButtonModules) {
+            module.initialize();
+        }
+    }
+
+    private ProductionDetail currentProductionDetail() {
+        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+        return state == null ? null : state.productionDetail;
     }
 
     private void configureScanInput(EditText editText, ScanViewModel.CurrentScanState targetState) {
@@ -328,12 +439,18 @@ public class MainActivity extends AppCompatActivity {
         productionPanel.setVisibility(state.productionVisible ? View.VISIBLE : View.GONE);
         if (!state.productionVisible) {
             closeCheckRuncardByWorkOrder();
+            if (holdFunctionManager != null && holdFunctionManager.isOpen()) {
+                holdFunctionManager.close();
+            }
         }
         String currentWorkOrder = state.productionDetail == null ? "" : displayOrDash(state.productionDetail.workOrder);
         if (checkRuncardPanel.getVisibility() == View.VISIBLE
                 && !activeCheckRuncardWorkOrder.isEmpty()
                 && !activeCheckRuncardWorkOrder.equals(currentWorkOrder)) {
             closeCheckRuncardByWorkOrder();
+        }
+        if (holdFunctionManager != null) {
+            holdFunctionManager.refreshHeader();
         }
         summaryButton.setEnabled(state.step == ScanViewModel.WorkflowStep.INPUT_QTY);
         saveButton.setText(state.saveButtonText);
@@ -547,11 +664,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void toggleCheckRuncardView(boolean show) {
         int checkVisibility = show ? View.VISIBLE : View.GONE;
-        int standardVisibility = show ? View.GONE : View.VISIBLE;
+        if (show && holdFunctionManager != null && holdFunctionManager.isOpen()) {
+            holdFunctionManager.close();
+        }
 
         if (checkRuncardPanel != null) {
             checkRuncardPanel.setVisibility(checkVisibility);
         }
+        setStandardWorkflowVisible(!show);
+    }
+
+    private void setStandardWorkflowVisible(boolean visible) {
+        int standardVisibility = visible ? View.VISIBLE : View.GONE;
         if (productionDetailSection != null) {
             productionDetailSection.setVisibility(standardVisibility);
         }

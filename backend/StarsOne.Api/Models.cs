@@ -65,3 +65,38 @@ public sealed record SaveProductionRequest(
 public sealed record SaveProductionResponse(
     bool Success,
     string Message);
+
+public sealed record HoldRequest(
+    string WorkOrder,
+    string Runcard,
+    string? Material,
+    string? SelectReason,
+    string? TopicDamage,
+    string? HoldComment,
+    string? ReleaseComment,
+    string ActionType);
+
+public sealed record HoldResponse(
+    bool Success,
+    string Message);
+
+public sealed record SplitRequest(
+    string WorkOrder,
+    string? Material,
+    string MotherRuncard,
+    string MotherAssyLot,
+    int SplitQty,
+    int MotherQty,
+    string? WorkCenter,
+    string? Cby,
+    string? CustomerType);
+
+public sealed record SplitResponse(
+    bool Success,
+    string Message,
+    string NewRuncard,
+    string NewAssy,
+    int SplitQty,
+    int MotherQty,
+    string? WorkCenter,
+    DateTimeOffset Cdate);

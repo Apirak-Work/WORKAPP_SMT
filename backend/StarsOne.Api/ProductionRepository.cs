@@ -165,6 +165,217 @@ public sealed class ProductionRepository
         return new SaveProductionResponse(affected > 0, affected > 0 ? "Saved." : "No data was saved.");
     }
 
+    public async Task<HoldResponse> SaveHoldActionAsync(
+        HoldRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actionType = (request.ActionType ?? "").Trim().ToUpperInvariant();
+        if (actionType is not ("HOLD" or "RELEASE"))
+        {
+            return new HoldResponse(false, "ActionType must be HOLD or RELEASE.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Runcard))
+        {
+            return new HoldResponse(false, "Runcard is required.");
+        }
+
+        if (actionType == "HOLD"
+            && (string.IsNullOrWhiteSpace(request.SelectReason)
+                || string.IsNullOrWhiteSpace(request.TopicDamage)
+                || string.IsNullOrWhiteSpace(request.HoldComment)))
+        {
+            return new HoldResponse(false, "Reason, topic damage, and hold comment are required.");
+        }
+
+        if (actionType == "RELEASE" && string.IsNullOrWhiteSpace(request.ReleaseComment))
+        {
+            return new HoldResponse(false, "Release hold comment is required.");
+        }
+
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(_queries.Get("SaveHoldAction"), connection);
+        command.Parameters.AddWithValue("@WorkOrder", (object?)request.WorkOrder ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Runcard", request.Runcard);
+        command.Parameters.AddWithValue("@Material", (object?)request.Material ?? DBNull.Value);
+        command.Parameters.AddWithValue("@SelectReason", (object?)request.SelectReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("@TopicDamage", (object?)request.TopicDamage ?? DBNull.Value);
+        command.Parameters.AddWithValue("@HoldComment", (object?)request.HoldComment ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ReleaseComment", (object?)request.ReleaseComment ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActionType", actionType);
+
+        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        return new HoldResponse(
+            affected > 0,
+            affected > 0 ? $"{actionType} saved." : "No runcard was updated.");
+    }
+
+    public async Task<SplitResponse> SplitRuncardAsync(
+        SplitRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.MotherRuncard))
+        {
+            return new SplitResponse(false, "Mother runcard is required.", "", "", 0, 0, null, DateTimeOffset.UtcNow);
+        }
+
+        if (request.SplitQty <= 0)
+        {
+            return new SplitResponse(false, "Split qty must be greater than zero.", "", "", 0, 0, null, DateTimeOffset.UtcNow);
+        }
+
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var databaseMotherQty = await ReadRequiredIntAsync(
+                connection,
+                transaction,
+                _queries.Get("GetMotherQtyForSplit"),
+                command => command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard),
+                cancellationToken);
+            var originalMotherQty = request.MotherQty > 0 ? request.MotherQty : databaseMotherQty;
+
+            if (request.SplitQty >= databaseMotherQty)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new SplitResponse(false, "Split qty must be less than mother qty.", "", "", request.SplitQty, databaseMotherQty, null, DateTimeOffset.UtcNow);
+            }
+
+            var childCount = await ReadRequiredIntAsync(
+                connection,
+                transaction,
+                _queries.Get("CountSplitChildren"),
+                command => command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard),
+                cancellationToken);
+
+            var newRuncard = await GenerateUniqueRuncardAsync(connection, transaction, cancellationToken);
+            var newAssy = GenerateChildAssyLot(request.MotherAssyLot, request.CustomerType, childCount + 1);
+            var remainingMotherQty = databaseMotherQty - request.SplitQty;
+            var cdate = DateTimeOffset.UtcNow;
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                _queries.Get("InsertSplitChildLot"),
+                command =>
+                {
+                    command.Parameters.AddWithValue("@ChildWo", request.WorkOrder);
+                    command.Parameters.AddWithValue("@NewRuncard", newRuncard);
+                    command.Parameters.AddWithValue("@NewAssy", newAssy);
+                    command.Parameters.AddWithValue("@Material", (object?)request.Material ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
+                    command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard);
+                    command.Parameters.AddWithValue("@MotherQty", originalMotherQty);
+                    command.Parameters.AddWithValue("@Cby", (object?)request.Cby ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@Cdate", cdate);
+                },
+                cancellationToken);
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                _queries.Get("UpdateMotherQtyAfterSplit"),
+                command =>
+                {
+                    command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard);
+                    command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
+                },
+                cancellationToken);
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                _queries.Get("InsertSplitHistory"),
+                command =>
+                {
+                    command.Parameters.AddWithValue("@MotherWo", request.WorkOrder);
+                    command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard);
+                    command.Parameters.AddWithValue("@MotherAssy", request.MotherAssyLot);
+                    command.Parameters.AddWithValue("@MotherQty", originalMotherQty);
+                    command.Parameters.AddWithValue("@ChildWo", request.WorkOrder);
+                    command.Parameters.AddWithValue("@NewRuncard", newRuncard);
+                    command.Parameters.AddWithValue("@NewAssy", newAssy);
+                    command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
+                    command.Parameters.AddWithValue("@WorkCenter", (object?)request.WorkCenter ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@Cby", (object?)request.Cby ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@Cdate", cdate);
+                },
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return new SplitResponse(true, "Split saved.", newRuncard, newAssy, request.SplitQty, remainingMotherQty, request.WorkCenter, cdate);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<string> GenerateUniqueRuncardAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var candidate = DateTime.UtcNow.ToString("yyMMddHHmmssfff") + attempt;
+            var exists = await ExistsAsync(
+                connection,
+                transaction,
+                _queries.Get("RuncardExists"),
+                command => command.Parameters.AddWithValue("@Runcard", candidate),
+                cancellationToken);
+            if (!exists)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("Unable to generate a unique child runcard.");
+    }
+
+    private static string GenerateChildAssyLot(string? motherAssy, string? customerType, int splitSequence)
+    {
+        var baseAssy = (motherAssy ?? "").Trim();
+        if (string.Equals(customerType, "onsemi", StringComparison.OrdinalIgnoreCase))
+        {
+            if (baseAssy.StartsWith("S4", StringComparison.OrdinalIgnoreCase))
+            {
+                baseAssy = "S5" + baseAssy[2..];
+            }
+
+            return baseAssy + ToAlphabetSuffix(splitSequence);
+        }
+
+        return string.IsNullOrWhiteSpace(baseAssy)
+            ? $"CHILD{ToAlphabetSuffix(splitSequence)}"
+            : $"{baseAssy}-{ToAlphabetSuffix(splitSequence)}";
+    }
+
+    private static string ToAlphabetSuffix(int sequence)
+    {
+        if (sequence <= 0)
+        {
+            return "A";
+        }
+
+        var value = sequence;
+        var chars = new Stack<char>();
+        while (value > 0)
+        {
+            value--;
+            chars.Push((char)('A' + value % 26));
+            value /= 26;
+        }
+
+        return new string(chars.ToArray());
+    }
+
     private static async Task<bool> ExistsAsync(
         SqlConnection connection,
         string sql,
@@ -175,6 +386,49 @@ public sealed class ProductionRepository
         configure(command);
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return result is not null && result != DBNull.Value;
+    }
+
+    private static async Task<bool> ExistsAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string sql,
+        Action<SqlCommand> configure,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection, transaction);
+        configure(command);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is not null && result != DBNull.Value;
+    }
+
+    private static async Task<int> ReadRequiredIntAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string sql,
+        Action<SqlCommand> configure,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection, transaction);
+        configure(command);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        if (result is null || result == DBNull.Value)
+        {
+            throw new InvalidOperationException("Expected integer query result was empty.");
+        }
+
+        return Convert.ToInt32(result);
+    }
+
+    private static async Task ExecuteNonQueryAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string sql,
+        Action<SqlCommand> configure,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection, transaction);
+        configure(command);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static string? ReadString(SqlDataReader reader, string column)

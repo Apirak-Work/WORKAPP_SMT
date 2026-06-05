@@ -64,9 +64,24 @@ app.MapGet("/api/production/runcards/{runcardNo}/opers", async (
 app.MapGet("/api/production/workorders/{workOrderNo}/runcards", async (
     string workOrderNo,
     ProductionRepository repository,
+    ILoggerFactory loggerFactory,
     CancellationToken cancellationToken) =>
 {
     var runcards = await repository.GetRuncardsByWorkOrderAsync(workOrderNo, cancellationToken);
+    var logger = loggerFactory.CreateLogger("CheckRuncardByWo");
+    logger.LogInformation("WO {WorkOrderNo} returned {Count} runcards", workOrderNo, runcards.Count);
+    foreach (var row in runcards)
+    {
+        logger.LogInformation(
+            "WO {WorkOrderNo} RC={Rc} Type={Type} Assy={Assy} Qty={Qty} Action={RcAction} Status={Status}",
+            workOrderNo,
+            row.Rc,
+            row.Type,
+            row.Assy,
+            row.Qty,
+            row.RcAction,
+            row.Status);
+    }
     return Results.Ok(runcards);
 });
 
@@ -76,6 +91,24 @@ app.MapPost("/api/production/save", async (
     CancellationToken cancellationToken) =>
 {
     var result = await repository.SaveProductionAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/runcard/hold", async (
+    [FromBody] HoldRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.SaveHoldActionAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/runcard/split", async (
+    [FromBody] SplitRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.SplitRuncardAsync(request, cancellationToken);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
