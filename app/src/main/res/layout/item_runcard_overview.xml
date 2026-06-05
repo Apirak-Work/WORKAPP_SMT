@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="674dp"
+    android:layout_height="44dp"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/runcardType"
+        style="@style/OperBodyCell"
+        android:layout_width="76dp" />
+
+    <TextView
+        android:id="@+id/runcardNo"
+        style="@style/OperBodyCell"
+        android:layout_width="132dp"
+        android:textColor="@color/link_blue"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/runcardAssy"
+        style="@style/OperBodyCell"
+        android:layout_width="160dp" />
+
+    <TextView
+        android:id="@+id/runcardQty"
+        style="@style/OperBodyCell"
+        android:layout_width="72dp" />
+
+    <TextView
+        android:id="@+id/runcardAction"
+        style="@style/OperBodyCell"
+        android:layout_width="102dp" />
+
+    <TextView
+        android:id="@+id/runcardStatus"
+        style="@style/OperBodyCell"
+        android:layout_width="132dp" />
+</LinearLayout>
