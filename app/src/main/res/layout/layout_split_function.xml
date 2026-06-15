@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layoutSplitFunction"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:background="@drawable/bg_info_cell"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SPLIT FUNCTION"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Create child runcard from current lot"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/splitCloseButton"
+            android:layout_width="82dp"
+            android:layout_height="34dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="Close"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_split_frame_current"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:text="CURRENT DATA"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/WorkflowLabel"
+                    android:text="Mother Runcard" />
+
+                <TextView
+                    android:id="@+id/splitCurrentRuncard"
+                    style="@style/ProductionInfoValue"
+                    android:layout_width="match_parent"
+                    android:ellipsize="none"
+                    android:maxLines="2"
+                    android:singleLine="false"
+                    android:text="-"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/WorkflowLabel"
+                    android:text="Mother Assy Lot" />
+
+                <TextView
+                    android:id="@+id/splitCurrentAssy"
+                    style="@style/ProductionInfoValue"
+                    android:layout_width="match_parent"
+                    android:ellipsize="none"
+                    android:maxLines="2"
+                    android:singleLine="false"
+                    android:text="-"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:layout_marginTop="8dp"
+            android:text="Real Mother QTY" />
+
+        <TextView
+            android:id="@+id/splitMotherQtyValue"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_value_box"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="10dp"
+            android:text="-"
+            android:textColor="@color/link_blue"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_split_frame_new"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:text="NEW DATA"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/WorkflowLabel"
+                    android:text="New Runcard" />
+
+                <TextView
+                    android:id="@+id/splitNewRuncardPreview"
+                    style="@style/ProductionInfoValue"
+                    android:layout_width="match_parent"
+                    android:ellipsize="none"
+                    android:maxLines="2"
+                    android:singleLine="false"
+                    android:text="260604XXXX"
+                    android:textColor="@color/danger"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/WorkflowLabel"
+                    android:text="New Assy Lot" />
+
+                <TextView
+                    android:id="@+id/splitNewAssyPreview"
+                    style="@style/ProductionInfoValue"
+                    android:layout_width="match_parent"
+                    android:ellipsize="none"
+                    android:maxLines="2"
+                    android:singleLine="false"
+                    android:text="ASSY-A"
+                    android:textColor="@color/danger"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:layout_marginTop="8dp"
+            android:text="Split QTY" />
+
+        <EditText
+            android:id="@+id/splitNewQtyInput"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_value_box"
+            android:hint="Split Qty"
+            android:inputType="number"
+            android:paddingHorizontal="10dp"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:layout_marginTop="8dp"
+            android:text="Remaining Mother QTY" />
+
+        <TextView
+            android:id="@+id/splitRemainingMotherQtyValue"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_value_box"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="10dp"
+            android:text="-"
+            android:textColor="@color/link_blue"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/splitValidationMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_error"
+        android:padding="8dp"
+        android:textColor="@color/danger"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        style="@style/WorkflowLabel"
+        android:layout_marginTop="8dp"
+        android:text="SPLIT HISTORY TABLE" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="4dp">
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="false"
+            android:scrollbars="horizontal">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="128dp"
+                        android:layout_height="30dp"
+                        android:text="Runcard" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="150dp"
+                        android:layout_height="30dp"
+                        android:text="AssyLot" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="72dp"
+                        android:layout_height="30dp"
+                        android:text="Qty" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="128dp"
+                        android:layout_height="30dp"
+                        android:text="Mother" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="92dp"
+                        android:layout_height="30dp"
+                        android:text="MotherQty" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="86dp"
+                        android:layout_height="30dp"
+                        android:text="WC" />
+
+                    <TextView
+                        style="@style/OperHeaderCell"
+                        android:layout_width="156dp"
+                        android:layout_height="30dp"
+                        android:text="Cdate" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/splitHistoryRecyclerView"
+                    android:layout_width="812dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:scrollbars="vertical" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/splitHistoryEmptyText"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="No data available in table"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <Button
+        android:id="@+id/splitConfirmButton"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="10dp"
+        android:enabled="false"
+        android:text="Confirm Split"
+        android:textStyle="bold" />
+</LinearLayout>

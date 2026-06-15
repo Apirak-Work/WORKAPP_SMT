@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layoutScrapFunction"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:background="@drawable/bg_info_cell"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="REJECT with Criteria"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/scrapCloseButton"
+            android:layout_width="82dp"
+            android:layout_height="34dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="Close"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        style="@style/WorkflowLabel"
+        android:layout_marginTop="10dp"
+        android:text="Reject Qty." />
+
+    <EditText
+        android:id="@+id/scrapRejectQtyInput"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_value_box"
+        android:hint="Reject Qty."
+        android:imeOptions="actionNext"
+        android:inputType="number"
+        android:paddingHorizontal="10dp"
+        android:singleLine="true"
+        android:textColor="#000000"
+        android:textColorHint="#888888"
+        android:textCursorDrawable="@null"
+        android:textSelectHandle="@null"
+        android:textSelectHandleLeft="@null"
+        android:textSelectHandleRight="@null"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        style="@style/WorkflowLabel"
+        android:layout_marginTop="8dp"
+        android:text="Group Criteria" />
+
+    <Spinner
+        android:id="@+id/scrapGroupSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_value_box"
+        android:paddingHorizontal="8dp" />
+
+    <TextView
+        style="@style/WorkflowLabel"
+        android:layout_marginTop="8dp"
+        android:text="Reason / Defect Code" />
+
+    <Spinner
+        android:id="@+id/scrapReasonSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_value_box"
+        android:paddingHorizontal="8dp" />
+
+    <Button
+        android:id="@+id/scrapAddRejectButton"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_marginTop="8dp"
+        android:minHeight="0dp"
+        android:text="Add Reject"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/OperHeaderCell"
+                android:layout_width="86dp"
+                android:text="Code" />
+
+            <TextView
+                style="@style/OperHeaderCell"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Reject Description" />
+
+            <TextView
+                style="@style/OperHeaderCell"
+                android:layout_width="78dp"
+                android:text="Rej Qty." />
+
+            <TextView
+                style="@style/OperHeaderCell"
+                android:layout_width="58dp"
+                android:text="" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="190dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/scrapRejectRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="vertical" />
+
+            <TextView
+                android:id="@+id/scrapRejectEmptyText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="No reject rows added"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/scrapConfirmButton"
+        android:layout_width="150dp"
+        android:layout_height="42dp"
+        android:layout_gravity="end"
+        android:layout_marginTop="10dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:text="Confirm Reject"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+</LinearLayout>

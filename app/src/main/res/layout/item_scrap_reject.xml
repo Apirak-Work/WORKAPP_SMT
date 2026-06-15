@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/rejectCodeCell"
+        style="@style/OperBodyCell"
+        android:layout_width="86dp" />
+
+    <TextView
+        android:id="@+id/rejectDescriptionCell"
+        style="@style/OperBodyCell"
+        android:layout_width="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/rejectQtyCell"
+        style="@style/OperBodyCell"
+        android:layout_width="78dp" />
+
+    <Button
+        android:id="@+id/rejectDeleteButton"
+        android:layout_width="58dp"
+        android:layout_height="42dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:padding="0dp"
+        android:text="Del"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+</LinearLayout>
