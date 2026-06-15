@@ -52,6 +52,16 @@ app.MapGet("/api/production/runcards/{runcardNo}", async (
     return detail is null ? Results.NotFound() : Results.Ok(detail);
 });
 
+app.MapGet("/api/production/runcard/{rc}/validate", async (
+    string rc,
+    [FromQuery] string? workCenter,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.ValidateRuncardGatesAsync(rc, workCenter, cancellationToken);
+    return result.IsValid ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 app.MapGet("/api/production/runcards/{runcardNo}/opers", async (
     string runcardNo,
     ProductionRepository repository,
@@ -110,6 +120,24 @@ app.MapPost("/api/production/runcard/split", async (
 {
     var result = await repository.SplitRuncardAsync(request, cancellationToken);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/runcard/merge", async (
+    [FromBody] MergeRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.MergeRuncardsAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapGet("/api/production/runcard/{rc}/split-history", async (
+    string rc,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var rows = await repository.GetSplitHistoryAsync(rc, cancellationToken);
+    return Results.Ok(rows);
 });
 
 app.Run();

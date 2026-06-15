@@ -55,6 +55,89 @@ public sealed class ProductionRepository
         return new ValidateScanResponse(allowed, message, userValid, machineValid, runcardValid);
     }
 
+    public async Task<ValidationResponse> ValidateRuncardGatesAsync(
+        string runcardNo,
+        string? workCenter,
+        CancellationToken cancellationToken)
+    {
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(runcardNo))
+        {
+            errors.Add("Runcard is required.");
+            return new ValidationResponse(false, errors);
+        }
+
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+
+        var flag = await ReadOptionalStringAsync(
+            connection,
+            _queries.Get("GateGetRuncardFlag"),
+            command => command.Parameters.AddWithValue("@RC", runcardNo),
+            cancellationToken);
+        if (flag is null)
+        {
+            errors.Add("Runcard was not found in Runcard_Detail.");
+            return new ValidationResponse(false, errors);
+        }
+
+        if (string.Equals(flag, "H", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("Runcard is on HOLD.");
+        }
+        if (string.Equals(flag, "X", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("Runcard is closed or scrapped.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(workCenter))
+        {
+            var atWorkCenter = await ExistsAsync(
+                connection,
+                _queries.Get("GateRuncardAtWorkCenter"),
+                command =>
+                {
+                    command.Parameters.AddWithValue("@RC", runcardNo);
+                    command.Parameters.AddWithValue("@WorkCenter", workCenter);
+                },
+                cancellationToken);
+            if (!atWorkCenter)
+            {
+                errors.Add($"Runcard is not at current work center {workCenter}.");
+            }
+        }
+
+        var hasPendingActivity = await ExistsAsync(
+            connection,
+            _queries.Get("GatePendingActivities"),
+            command =>
+            {
+                command.Parameters.AddWithValue("@RC", runcardNo);
+                command.Parameters.AddWithValue("@WorkCenter", (object?)workCenter ?? DBNull.Value);
+            },
+            cancellationToken);
+        if (hasPendingActivity)
+        {
+            errors.Add("Runcard has pending activity at the current work center.");
+        }
+
+        var hasActiveBlock = await ExistsAsync(
+            connection,
+            _queries.Get("GateActiveBlocks"),
+            command =>
+            {
+                command.Parameters.AddWithValue("@RC", runcardNo);
+                command.Parameters.AddWithValue("@WorkCenter", (object?)workCenter ?? DBNull.Value);
+            },
+            cancellationToken);
+        if (hasActiveBlock)
+        {
+            errors.Add("Runcard has an active B2B or block flag.");
+        }
+
+        return new ValidationResponse(errors.Count == 0, errors);
+    }
+
     public async Task<ProductionDetailResponse?> GetProductionDetailAsync(
         string runcardNo,
         CancellationToken cancellationToken)
@@ -227,6 +310,12 @@ public sealed class ProductionRepository
 
         await using var connection = _connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
+        var employeeId = await ResolveEmployeeIdAsync(connection, request.Cby, cancellationToken);
+        if (employeeId is null)
+        {
+            return new SplitResponse(false, "Cannot map AD username to 6-digit employee ID.", "", "", 0, 0, null, DateTimeOffset.UtcNow);
+        }
+
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         try
@@ -239,10 +328,10 @@ public sealed class ProductionRepository
                 cancellationToken);
             var originalMotherQty = request.MotherQty > 0 ? request.MotherQty : databaseMotherQty;
 
-            if (request.SplitQty >= databaseMotherQty)
+            if (request.SplitQty > databaseMotherQty)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return new SplitResponse(false, "Split qty must be less than mother qty.", "", "", request.SplitQty, databaseMotherQty, null, DateTimeOffset.UtcNow);
+                return new SplitResponse(false, "Split qty must not exceed mother qty.", "", "", request.SplitQty, databaseMotherQty, null, DateTimeOffset.UtcNow);
             }
 
             var childCount = await ReadRequiredIntAsync(
@@ -270,12 +359,12 @@ public sealed class ProductionRepository
                     command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
                     command.Parameters.AddWithValue("@MotherRuncard", request.MotherRuncard);
                     command.Parameters.AddWithValue("@MotherQty", originalMotherQty);
-                    command.Parameters.AddWithValue("@Cby", (object?)request.Cby ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@Cby", employeeId);
                     command.Parameters.AddWithValue("@Cdate", cdate);
                 },
                 cancellationToken);
 
-            await ExecuteNonQueryAsync(
+            var updatedMotherRows = await ExecuteNonQueryAsync(
                 connection,
                 transaction,
                 _queries.Get("UpdateMotherQtyAfterSplit"),
@@ -285,6 +374,11 @@ public sealed class ProductionRepository
                     command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
                 },
                 cancellationToken);
+            if (updatedMotherRows <= 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new SplitResponse(false, "Mother qty was not updated. Please reload and try again.", "", "", request.SplitQty, databaseMotherQty, null, DateTimeOffset.UtcNow);
+            }
 
             await ExecuteNonQueryAsync(
                 connection,
@@ -301,7 +395,7 @@ public sealed class ProductionRepository
                     command.Parameters.AddWithValue("@NewAssy", newAssy);
                     command.Parameters.AddWithValue("@SplitQty", request.SplitQty);
                     command.Parameters.AddWithValue("@WorkCenter", (object?)request.WorkCenter ?? DBNull.Value);
-                    command.Parameters.AddWithValue("@Cby", (object?)request.Cby ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@Cby", employeeId);
                     command.Parameters.AddWithValue("@Cdate", cdate);
                 },
                 cancellationToken);
@@ -316,14 +410,165 @@ public sealed class ProductionRepository
         }
     }
 
+    public async Task<IEnumerable<SplitHistoryDto>> GetSplitHistoryAsync(
+        string runcardNo,
+        CancellationToken cancellationToken)
+    {
+        var rows = new List<SplitHistoryDto>();
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(_queries.Get("GetSplitHistory"), connection);
+        command.Parameters.AddWithValue("@RC", runcardNo);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SplitHistoryDto(
+                ReadString(reader, "Runcard"),
+                ReadString(reader, "AssyLot"),
+                ReadInt(reader, "Qty"),
+                ReadString(reader, "Mother"),
+                ReadInt(reader, "MotherQty"),
+                ReadString(reader, "Wc"),
+                ReadDateTimeOffset(reader, "Cdate")));
+        }
+
+        return rows;
+    }
+
+    public async Task<MergeResponse> MergeRuncardsAsync(
+        MergeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var mainRuncard = request.MainRuncard?.Trim() ?? "";
+        var sourceRuncards = (request.SourceRuncards ?? new List<string>())
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (string.IsNullOrWhiteSpace(mainRuncard))
+        {
+            return new MergeResponse(false, "Main runcard is required.", 0, mainRuncard);
+        }
+        if (sourceRuncards.Count == 0)
+        {
+            return new MergeResponse(false, "At least one source runcard is required.", 0, mainRuncard);
+        }
+        if (sourceRuncards.Any(source => string.Equals(source, mainRuncard, StringComparison.OrdinalIgnoreCase)))
+        {
+            return new MergeResponse(false, "Source runcard cannot be the same as main runcard.", 0, mainRuncard);
+        }
+
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+        var employeeId = await ResolveEmployeeIdAsync(connection, request.Cby, cancellationToken);
+        if (employeeId is null)
+        {
+            return new MergeResponse(false, "Cannot map AD username to 6-digit employee ID.", 0, mainRuncard);
+        }
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var allRuncards = new List<string> { mainRuncard };
+            allRuncards.AddRange(sourceRuncards);
+            var rows = await ReadMergeRuncardRowsAsync(connection, transaction, allRuncards, cancellationToken);
+            var mainRow = rows.FirstOrDefault(row => string.Equals(row.Runcard, mainRuncard, StringComparison.OrdinalIgnoreCase));
+            if (mainRow is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new MergeResponse(false, "Main runcard was not found or already closed.", 0, mainRuncard);
+            }
+
+            var sourceRows = rows
+                .Where(row => sourceRuncards.Any(source => string.Equals(source, row.Runcard, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (sourceRows.Count != sourceRuncards.Count)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new MergeResponse(false, "One or more source runcards were not found or already closed.", 0, mainRuncard);
+            }
+
+            var totalSourceQty = sourceRows.Sum(row => row.Qty);
+            if (totalSourceQty <= 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new MergeResponse(false, "Total source qty must be greater than zero.", 0, mainRuncard);
+            }
+
+            var updatedMainRows = await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                _queries.Get("UpdateMainRuncardQtyForMerge"),
+                command =>
+                {
+                    command.Parameters.AddWithValue("@MainRuncard", mainRuncard);
+                    command.Parameters.AddWithValue("@TotalSourceQty", totalSourceQty);
+                },
+                cancellationToken);
+            if (updatedMainRows <= 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new MergeResponse(false, "Main runcard qty was not updated.", 0, mainRuncard);
+            }
+
+            var closedSourceRows = await ExecuteMergeInQueryAsync(
+                connection,
+                transaction,
+                _queries.Get("CloseSourceRuncardsForMerge"),
+                sourceRuncards,
+                cancellationToken);
+            if (closedSourceRows != sourceRuncards.Count)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new MergeResponse(false, "Not all source runcards were closed.", 0, mainRuncard);
+            }
+
+            var mergedMainQty = mainRow.Qty + totalSourceQty;
+            var cdate = DateTimeOffset.UtcNow;
+            foreach (var source in sourceRows)
+            {
+                await ExecuteNonQueryAsync(
+                    connection,
+                    transaction,
+                    _queries.Get("InsertMergeHistory"),
+                    command =>
+                    {
+                        command.Parameters.AddWithValue("@MotherWo", (object?)mainRow.WorkOrder ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@MainRuncard", mainRuncard);
+                        command.Parameters.AddWithValue("@MotherAssy", (object?)mainRow.AssyLot ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@MotherQty", mergedMainQty);
+                        command.Parameters.AddWithValue("@ChildWo", (object?)source.WorkOrder ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@SourceRuncard", source.Runcard);
+                        command.Parameters.AddWithValue("@SourceAssy", (object?)source.AssyLot ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@SourceQty", source.Qty);
+                        command.Parameters.AddWithValue("@WorkCenter", (object?)request.WorkCenter ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@Cby", employeeId);
+                        command.Parameters.AddWithValue("@Cdate", cdate);
+                    },
+                    cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return new MergeResponse(true, $"Merge saved. Total merged qty: {totalSourceQty}.", totalSourceQty, mainRuncard);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     private async Task<string> GenerateUniqueRuncardAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         CancellationToken cancellationToken)
     {
-        for (var attempt = 0; attempt < 10; attempt++)
+        var prefix = DateTime.UtcNow.ToString("yyMMdd");
+        for (var running = 1; running <= 9999; running++)
         {
-            var candidate = DateTime.UtcNow.ToString("yyMMddHHmmssfff") + attempt;
+            var candidate = prefix + running.ToString("D4");
             var exists = await ExistsAsync(
                 connection,
                 transaction,
@@ -336,7 +581,32 @@ public sealed class ProductionRepository
             }
         }
 
-        throw new InvalidOperationException("Unable to generate a unique child runcard.");
+        throw new InvalidOperationException("Unable to generate a unique 10-digit child runcard.");
+    }
+
+    private async Task<string?> ResolveEmployeeIdAsync(
+        SqlConnection connection,
+        string? username,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = username?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return null;
+        }
+
+        if (trimmed.Length <= 6 && trimmed.All(char.IsLetterOrDigit))
+        {
+            return trimmed;
+        }
+
+        await using var command = new SqlCommand(_queries.Get("GetEmployeeIdByUsername"), connection);
+        command.Parameters.AddWithValue("@Username", trimmed);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        var employeeId = Convert.ToString(result)?.Trim();
+        return string.IsNullOrWhiteSpace(employeeId) || employeeId.Length > 6
+            ? null
+            : employeeId;
     }
 
     private static string GenerateChildAssyLot(string? motherAssy, string? customerType, int splitSequence)
@@ -388,6 +658,18 @@ public sealed class ProductionRepository
         return result is not null && result != DBNull.Value;
     }
 
+    private static async Task<string?> ReadOptionalStringAsync(
+        SqlConnection connection,
+        string sql,
+        Action<SqlCommand> configure,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection);
+        configure(command);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is null || result == DBNull.Value ? null : Convert.ToString(result);
+    }
+
     private static async Task<bool> ExistsAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -419,7 +701,7 @@ public sealed class ProductionRepository
         return Convert.ToInt32(result);
     }
 
-    private static async Task ExecuteNonQueryAsync(
+    private static async Task<int> ExecuteNonQueryAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         string sql,
@@ -428,13 +710,78 @@ public sealed class ProductionRepository
     {
         await using var command = new SqlCommand(sql, connection, transaction);
         configure(command);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private async Task<List<MergeRuncardRow>> ReadMergeRuncardRowsAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<string> runcards,
+        CancellationToken cancellationToken)
+    {
+        var rows = new List<MergeRuncardRow>();
+        var sql = BuildInClauseSql(_queries.Get("GetMergeRuncardRows"), runcards);
+        await using var command = new SqlCommand(sql, connection, transaction);
+        AddRuncardListParameters(command, runcards);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new MergeRuncardRow(
+                ReadString(reader, "Runcard") ?? "",
+                ReadString(reader, "WorkOrder"),
+                ReadString(reader, "AssyLot"),
+                ReadInt(reader, "Qty") ?? 0));
+        }
+
+        return rows;
+    }
+
+    private static async Task<int> ExecuteMergeInQueryAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string sqlTemplate,
+        IReadOnlyList<string> runcards,
+        CancellationToken cancellationToken)
+    {
+        var sql = BuildInClauseSql(sqlTemplate, runcards);
+        await using var command = new SqlCommand(sql, connection, transaction);
+        AddRuncardListParameters(command, runcards);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string BuildInClauseSql(string sqlTemplate, IReadOnlyList<string> values)
+    {
+        var parameterNames = values
+            .Select((_, index) => "@Runcard" + index)
+            .ToArray();
+        return sqlTemplate.Replace("{RuncardList}", string.Join(", ", parameterNames), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AddRuncardListParameters(SqlCommand command, IReadOnlyList<string> values)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            command.Parameters.AddWithValue("@Runcard" + index, values[index]);
+        }
+    }
+
+    private sealed record MergeRuncardRow(
+        string Runcard,
+        string? WorkOrder,
+        string? AssyLot,
+        int Qty);
 
     private static string? ReadString(SqlDataReader reader, string column)
     {
         var ordinal = reader.GetOrdinal(column);
         return reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal));
+    }
+
+    private static int? ReadInt(SqlDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : Convert.ToInt32(reader.GetValue(ordinal));
     }
 
     private static DateTimeOffset? ReadDateTimeOffset(SqlDataReader reader, string column)

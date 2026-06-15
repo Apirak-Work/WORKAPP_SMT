@@ -12,6 +12,10 @@ public sealed record ValidateScanResponse(
     bool MachineValid,
     bool RuncardValid);
 
+public sealed record ValidationResponse(
+    bool IsValid,
+    List<string> ErrorMessages);
+
 public sealed record ProductionDetailResponse(
     string RuncardNo,
     string? Description,
@@ -100,3 +104,24 @@ public sealed record SplitResponse(
     int MotherQty,
     string? WorkCenter,
     DateTimeOffset Cdate);
+
+public sealed record MergeRequest(
+    string MainRuncard,
+    List<string> SourceRuncards,
+    string? WorkCenter,
+    string? Cby);
+
+public sealed record MergeResponse(
+    bool Success,
+    string Message,
+    int TotalMergedQty,
+    string MainRuncard);
+
+public sealed record SplitHistoryDto(
+    string? Runcard,
+    string? AssyLot,
+    int? Qty,
+    string? Mother,
+    int? MotherQty,
+    string? Wc,
+    DateTimeOffset? Cdate);

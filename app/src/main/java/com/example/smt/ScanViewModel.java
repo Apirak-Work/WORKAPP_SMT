@@ -45,6 +45,7 @@ public class ScanViewModel extends ViewModel {
         final boolean qtyComplete;
         final String saveButtonText;
         final boolean saveEnabled;
+        final boolean saveLoading;
         final long startDateMillis;
         final long finishDateMillis;
         final long postingDateMillis;
@@ -71,6 +72,7 @@ public class ScanViewModel extends ViewModel {
                 boolean qtyComplete,
                 String saveButtonText,
                 boolean saveEnabled,
+                boolean saveLoading,
                 long startDateMillis,
                 long finishDateMillis,
                 long postingDateMillis,
@@ -96,6 +98,7 @@ public class ScanViewModel extends ViewModel {
             this.qtyComplete = qtyComplete;
             this.saveButtonText = saveButtonText;
             this.saveEnabled = saveEnabled;
+            this.saveLoading = saveLoading;
             this.startDateMillis = startDateMillis;
             this.finishDateMillis = finishDateMillis;
             this.postingDateMillis = postingDateMillis;
@@ -294,6 +297,9 @@ public class ScanViewModel extends ViewModel {
         if (saveCountdownRunning || !canSave()) {
             return;
         }
+        if (!validateProductionQtyBeforeSave()) {
+            return;
+        }
         startSaveCountdown();
     }
 
@@ -462,10 +468,7 @@ public class ScanViewModel extends ViewModel {
                         saveCountdownRunning = false;
                         saveButtonText = "SAVE CONFIRM";
                         if (result != null && result.success) {
-                            scannerMessage = result.message.isEmpty()
-                                    ? "Production saved successfully"
-                                    : result.message;
-                            publish(false, true);
+                            resetWorkflowAfterSave();
                         } else {
                             scannerMessage = result == null || result.message.isEmpty()
                                     ? "Production save failed"
@@ -483,6 +486,138 @@ public class ScanViewModel extends ViewModel {
                     }
                 }
         );
+    }
+
+    private void resetWorkflowAfterSave() {
+        cancelTimer(verifyTimer);
+        cancelTimer(saveTimer);
+        step = WorkflowStep.SCAN;
+        scanState = CurrentScanState.USER;
+        userId = "";
+        machineId = "";
+        runcard = "";
+        scannerMessage = "Production Confirmed. Scan or enter User ID";
+        verifyButtonText = "VERIFY & PROCEED";
+        verifyCountdownRunning = false;
+        verifyReady = false;
+        scanValidated = false;
+        saveCountdownRunning = false;
+        saveButtonText = "SAVE CONFIRM";
+        goodQty = "";
+        scrapQty = "";
+        startDateMillis = 0L;
+        finishDateMillis = 0L;
+        postingDateMillis = 0L;
+        productionDataLoading = false;
+        productionDataError = "";
+        productionDetail = null;
+        operRows = new ArrayList<>();
+        publish(false, true);
+    }
+
+    private void refreshProductionDataAfterSave() {
+        productionDataLoading = true;
+        productionDataError = "";
+        productionDetail = null;
+        operRows = new ArrayList<>();
+        publish(false, false);
+
+        productionRepository.loadProductionData(userId, machineId, runcard, new ProductionRepository.ProductionDataCallback() {
+            @Override
+            public void onSuccess(
+                    ProductionDetail detail,
+                    List<OperTrackingRow> rows,
+                    ProductionApiClient.ValidateScanResult validation
+            ) {
+                productionDataLoading = false;
+                productionDetail = detail;
+                operRows = rows == null ? new ArrayList<>() : rows;
+                scanValidated = validation != null && validation.allowed;
+                step = WorkflowStep.INPUT_QTY;
+                scannerMessage = "Production Confirmed";
+                finishDateMillis = 0L;
+                postingDateMillis = 0L;
+                publish(false, true);
+            }
+
+            @Override
+            public void onError(String message) {
+                productionDataLoading = false;
+                productionDataError = message == null ? "Unable to refresh production data" : message;
+                scannerMessage = "Production Confirmed. Refresh failed: " + productionDataError;
+                finishDateMillis = 0L;
+                postingDateMillis = 0L;
+                publish(false, true);
+            }
+        });
+    }
+
+    private boolean validateProductionQtyBeforeSave() {
+        int goodQtyNumber = parseQty(goodQty);
+        int scrapQtyNumber = parseQty(scrapQty);
+        int requiredReceiveQty = requiredReceiveQty();
+        if (requiredReceiveQty <= 0) {
+            scannerMessage = "Unable to determine Receive Qty for Save Confirm";
+            publish(false, false);
+            return false;
+        }
+        if (goodQtyNumber + scrapQtyNumber != requiredReceiveQty) {
+            scannerMessage = "Good Qty + Scrap Qty must equal Receive Qty (" + requiredReceiveQty + ")";
+            publish(false, false);
+            return false;
+        }
+        return true;
+    }
+
+    private int requiredReceiveQty() {
+        OperTrackingRow activeRow = activeOperRow();
+        if (activeRow != null) {
+            int receiveQty = parseFlexibleQty(activeRow.receive);
+            if (receiveQty > 0) {
+                return receiveQty;
+            }
+        }
+        if (productionDetail == null) {
+            return 0;
+        }
+        int rcQty = parseFlexibleQty(productionDetail.rcQuantity);
+        if (rcQty > 0) {
+            return rcQty;
+        }
+        return parseFlexibleQty(productionDetail.qtyRc);
+    }
+
+    private OperTrackingRow activeOperRow() {
+        if (operRows == null || operRows.isEmpty()) {
+            return null;
+        }
+        for (OperTrackingRow row : operRows) {
+            if (isSummaryOperRow(row)) {
+                continue;
+            }
+            if (!displayOrDash(row.receive).equals("-")
+                    && !displayOrDash(row.receive).equals("0")
+                    && displayOrDash(row.yield).equals("-")) {
+                return row;
+            }
+        }
+        for (int index = operRows.size() - 1; index >= 0; index--) {
+            OperTrackingRow row = operRows.get(index);
+            if (!isSummaryOperRow(row)) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private boolean isSummaryOperRow(OperTrackingRow row) {
+        String oper = displayOrDash(row.oper).trim();
+        String description = displayOrDash(row.description).toUpperCase(Locale.US);
+        return oper.equals("999") || description.contains("SUMMARY");
+    }
+
+    private String displayOrDash(String value) {
+        return value == null || value.trim().isEmpty() ? "-" : value.trim();
     }
 
     private boolean hasScanSet() {
@@ -522,6 +657,18 @@ public class ScanViewModel extends ViewModel {
     private int parseQty(String value) {
         try {
             return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private int parseFlexibleQty(String value) {
+        String normalized = value == null ? "" : value.replace(",", "").trim();
+        if (normalized.isEmpty() || normalized.equals("-") || normalized.equalsIgnoreCase("null")) {
+            return 0;
+        }
+        try {
+            return Math.round(Float.parseFloat(normalized));
         } catch (NumberFormatException ignored) {
             return 0;
         }
@@ -615,6 +762,7 @@ public class ScanViewModel extends ViewModel {
                 qtyComplete,
                 saveButtonText,
                 canSave,
+                saveCountdownRunning,
                 startDateMillis,
                 finishDateMillis,
                 postingDateMillis,

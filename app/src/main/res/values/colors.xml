@@ -10,7 +10,10 @@
     <color name="teal_dark">#007A72</color>
     <color name="warning">#FFB020</color>
     <color name="danger">#D92D20</color>
+    <color name="summary_magenta">#E6007E</color>
     <color name="line_muted">#CAD4D8</color>
     <color name="info_cell_bg">#FBFCFC</color>
     <color name="link_blue">#0078D4</color>
+    <color name="function_button_default">#E3F2FD</color>
+    <color name="function_button_active">#0D47A1</color>
 </resources>

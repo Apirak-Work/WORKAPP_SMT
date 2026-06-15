@@ -72,23 +72,6 @@ final class ProductionApiClient {
         return rows;
     }
 
-    List<RuncardOverviewRow> getRuncardsByWorkOrder(String workOrderNo) throws IOException, JSONException {
-        JSONArray array = new JSONArray(get("/api/production/workorders/" + urlSegment(workOrderNo) + "/runcards"));
-        List<RuncardOverviewRow> rows = new ArrayList<>();
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject json = array.getJSONObject(i);
-            rows.add(new RuncardOverviewRow(
-                    opt(json, "type"),
-                    opt(json, "rc"),
-                    opt(json, "assy"),
-                    opt(json, "qty"),
-                    opt(json, "rcAction"),
-                    opt(json, "status")
-            ));
-        }
-        return rows;
-    }
-
     ValidateScanResult validateScan(String userId, String machineId, String runcardNo) throws IOException, JSONException {
         JSONObject request = new JSONObject()
                 .put("userId", userId)

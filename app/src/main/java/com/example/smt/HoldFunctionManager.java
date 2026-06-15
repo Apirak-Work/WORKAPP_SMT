@@ -247,10 +247,6 @@ final class HoldFunctionManager {
         materialValue.setText(material);
         statusValue.setText(onHold ? "ON HOLD" : "NOT ON HOLD");
         statusValue.setTextColor(ContextCompat.getColor(context, onHold ? R.color.warning : R.color.teal_dark));
-
-        int releaseVisibility = onHold ? View.VISIBLE : View.GONE;
-        releaseHoldComment.setVisibility(releaseVisibility);
-        releaseHoldRuncardButton.setVisibility(releaseVisibility);
     }
 
     private void submitHold() {
@@ -259,26 +255,14 @@ final class HoldFunctionManager {
             Toast.makeText(context, "Runcard is not loaded yet", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (reasonSpinner.getSelectedItemPosition() <= 0) {
-            Toast.makeText(context, "Please select HOLD reason", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (topicDamageSpinner.getSelectedItemPosition() <= 0) {
-            Toast.makeText(context, "Please select topic damage", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String comment = holdComment.getText().toString().trim();
-        if (TextUtils.isEmpty(comment)) {
-            holdComment.setError("HOLD Comment is required");
-            holdComment.requestFocus();
+        if (!validateAllInputs()) {
             return;
         }
 
         executeHoldAction(
                 "HOLD",
                 detail,
-                comment,
+                holdComment.getText().toString().trim(),
                 reasonSpinner.getSelectedItem().toString(),
                 topicDamageSpinner.getSelectedItem().toString()
         );
@@ -290,14 +274,33 @@ final class HoldFunctionManager {
             Toast.makeText(context, "Runcard is not loaded yet", Toast.LENGTH_SHORT).show();
             return;
         }
-        String comment = releaseHoldComment.getText().toString().trim();
-        if (TextUtils.isEmpty(comment)) {
-            releaseHoldComment.setError("RELEASE HOLD Comment is required");
-            releaseHoldComment.requestFocus();
+        if (!validateAllInputs()) {
             return;
         }
 
-        executeHoldAction("RELEASE", detail, comment, "", "");
+        Toast.makeText(context, "Validation passed. Ready to call Release API.", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean validateAllInputs() {
+        if (TextUtils.isEmpty(holdComment.getText().toString().trim())) {
+            holdComment.setError("Required");
+            holdComment.requestFocus();
+            return false;
+        }
+        if (reasonSpinner.getSelectedItemPosition() <= 0) {
+            Toast.makeText(context, "Please select HOLD reason", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if (topicDamageSpinner.getSelectedItemPosition() <= 0) {
+            Toast.makeText(context, "Please select type of damage", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if (TextUtils.isEmpty(releaseHoldComment.getText().toString().trim())) {
+            releaseHoldComment.setError("Required");
+            releaseHoldComment.requestFocus();
+            return false;
+        }
+        return true;
     }
 
     private void executeHoldAction(

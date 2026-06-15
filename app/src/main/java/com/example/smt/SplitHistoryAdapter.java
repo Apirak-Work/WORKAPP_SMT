@@ -19,6 +19,12 @@ final class SplitHistoryAdapter extends RecyclerView.Adapter<SplitHistoryAdapter
         notifyItemInserted(0);
     }
 
+    void submitRows(List<SplitHistoryRow> nextRows) {
+        rows.clear();
+        rows.addAll(nextRows);
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {

@@ -1,13 +1,10 @@
 package com.example.smt;
 
-import android.app.Dialog;
 import android.content.Context;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -18,7 +15,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Collections;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -32,63 +32,79 @@ final class SplitMergeManager implements ActionButtonModule {
 
         String getCurrentUserId();
 
+        default void onOpenRequested() {
+        }
+
+        default void onClosed() {
+        }
+
         default void onSplitSucceeded(String newRuncard) {
         }
     }
 
     private final Context context;
+    private final View rootView;
     private final Button splitButton;
     private final Button mergeButton;
+    private final View[] standardWorkflowViews;
     private final CallbackBridge callback;
     private final ProductionRetrofitApi api = RetrofitProvider.productionApi();
+    private final TextView currentRuncard;
+    private final TextView currentAssy;
+    private final TextView motherQtyValue;
+    private final TextView newRuncardPreview;
+    private final TextView newAssyPreview;
+    private final EditText newQtyInput;
+    private final TextView remainingMotherQtyValue;
+    private final TextView validationMessage;
+    private final Button confirmButton;
+    private final Button closeButton;
+    private final RecyclerView historyRecyclerView;
+    private final TextView historyEmptyText;
     private SplitHistoryAdapter historyAdapter;
+    private Call<ValidationResponse> validationCall;
     private Call<SplitResponse> splitCall;
+    private Call<List<SplitHistoryItem>> historyCall;
 
-    SplitMergeManager(Context context, Button splitButton, Button mergeButton, CallbackBridge callback) {
+    SplitMergeManager(
+            Context context,
+            View rootView,
+            Button splitButton,
+            Button mergeButton,
+            View[] standardWorkflowViews,
+            CallbackBridge callback
+    ) {
         this.context = context;
+        this.rootView = rootView;
         this.splitButton = splitButton;
         this.mergeButton = mergeButton;
+        this.standardWorkflowViews = standardWorkflowViews;
         this.callback = callback;
+        this.currentRuncard = rootView.findViewById(R.id.splitCurrentRuncard);
+        this.currentAssy = rootView.findViewById(R.id.splitCurrentAssy);
+        this.motherQtyValue = rootView.findViewById(R.id.splitMotherQtyValue);
+        this.newRuncardPreview = rootView.findViewById(R.id.splitNewRuncardPreview);
+        this.newAssyPreview = rootView.findViewById(R.id.splitNewAssyPreview);
+        this.newQtyInput = rootView.findViewById(R.id.splitNewQtyInput);
+        this.remainingMotherQtyValue = rootView.findViewById(R.id.splitRemainingMotherQtyValue);
+        this.validationMessage = rootView.findViewById(R.id.splitValidationMessage);
+        this.confirmButton = rootView.findViewById(R.id.splitConfirmButton);
+        this.closeButton = rootView.findViewById(R.id.splitCloseButton);
+        this.historyRecyclerView = rootView.findViewById(R.id.splitHistoryRecyclerView);
+        this.historyEmptyText = rootView.findViewById(R.id.splitHistoryEmptyText);
     }
 
     @Override
     public void initialize() {
         splitButton.setOnClickListener(v -> openSplit());
         mergeButton.setOnClickListener(v -> openMerge());
-    }
-
-    private void openSplit() {
-        ProductionDetail detail = callback.getCurrentProductionDetail();
-        if (detail == null) {
-            Toast.makeText(context, "Production Detail is not loaded yet", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Dialog dialog = new Dialog(context);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        View content = LayoutInflater.from(context).inflate(R.layout.dialog_split_function, null);
-        dialog.setContentView(content);
-
-        TextView currentRuncard = content.findViewById(R.id.splitCurrentRuncard);
-        TextView currentAssy = content.findViewById(R.id.splitCurrentAssy);
-        TextView currentQty = content.findViewById(R.id.splitCurrentQty);
-        TextView newRuncardPreview = content.findViewById(R.id.splitNewRuncardPreview);
-        TextView newAssyPreview = content.findViewById(R.id.splitNewAssyPreview);
-        EditText newQtyInput = content.findViewById(R.id.splitNewQtyInput);
-        Button addButton = content.findViewById(R.id.splitAddButton);
-        Button closeButton = content.findViewById(R.id.splitCloseButton);
-        RecyclerView historyRecyclerView = content.findViewById(R.id.splitHistoryRecyclerView);
 
         historyAdapter = new SplitHistoryAdapter();
         historyRecyclerView.setLayoutManager(new LinearLayoutManager(context));
         historyRecyclerView.setAdapter(historyAdapter);
+        historyEmptyText.setVisibility(View.VISIBLE);
 
-        currentRuncard.setText("RC: " + displayOrDash(detail.runcardNo));
-        currentAssy.setText("ASSY: " + displayOrDash(detail.assyLot));
-        currentQty.setText("QTY: " + displayOrDash(detail.rcQuantity));
-        newRuncardPreview.setText(generateClientRuncardPreview());
-        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
-
+        closeButton.setOnClickListener(v -> closeSplit());
         newQtyInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -100,30 +116,186 @@ final class SplitMergeManager implements ActionButtonModule {
 
             @Override
             public void afterTextChanged(Editable editable) {
-                newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
+                ProductionDetail detail = callback.getCurrentProductionDetail();
+                updateSplitQtyState(detail);
             }
         });
+    }
 
-        addButton.setOnClickListener(v -> submitSplit(dialog, detail, newQtyInput, addButton));
-        closeButton.setOnClickListener(v -> {
-            if (splitCall != null) {
-                splitCall.cancel();
-                splitCall = null;
-            }
-            dialog.dismiss();
-        });
+    private void openSplit() {
+        ProductionDetail detail = callback.getCurrentProductionDetail();
+        if (detail == null) {
+            Toast.makeText(context, "Production Detail is not loaded yet", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        dialog.show();
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(
-                    (int) (context.getResources().getDisplayMetrics().widthPixels * 0.96f),
-                    android.view.WindowManager.LayoutParams.WRAP_CONTENT
-            );
+        callback.onOpenRequested();
+        setStandardWorkflowVisible(false);
+        rootView.setVisibility(View.VISIBLE);
+        resetSplitInputs();
+        historyEmptyText.setVisibility(View.VISIBLE);
+
+        currentRuncard.setText(displayOrDash(detail.runcardNo));
+        currentAssy.setText(displayOrDash(detail.assyLot));
+        motherQtyValue.setText(displayOrDash(detail.rcQuantity));
+        newRuncardPreview.setText(generateClientRuncardPreview());
+        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
+        remainingMotherQtyValue.setText(displayOrDash(detail.rcQuantity));
+        remainingMotherQtyValue.setTextColor(color(R.color.link_blue));
+        updateSplitQtyState(detail);
+
+        confirmButton.setOnClickListener(v -> submitSplit(detail, newQtyInput, confirmButton, historyEmptyText));
+        loadSplitHistory(detail.runcardNo, historyEmptyText);
+    }
+
+    void closeSplit() {
+        cancelCalls();
+        rootView.setVisibility(View.GONE);
+        setStandardWorkflowVisible(true);
+        resetSplitInputs();
+        callback.onClosed();
+    }
+
+    boolean isOpen() {
+        return rootView.getVisibility() == View.VISIBLE;
+    }
+
+    private void cancelCalls() {
+        if (historyCall != null) {
+            historyCall.cancel();
+            historyCall = null;
+        }
+        if (validationCall != null) {
+            validationCall.cancel();
+            validationCall = null;
+        }
+        if (splitCall != null) {
+            splitCall.cancel();
+            splitCall = null;
         }
     }
 
-    private void submitSplit(Dialog dialog, ProductionDetail detail, EditText qtyInput, Button addButton) {
+    private void resetSplitInputs() {
+        newQtyInput.setText("");
+        newQtyInput.setError(null);
+        confirmButton.setEnabled(false);
+        hideValidationMessage();
+        remainingMotherQtyValue.setText("-");
+        remainingMotherQtyValue.setTextColor(color(R.color.link_blue));
+        if (historyAdapter != null) {
+            historyAdapter.submitRows(Collections.emptyList());
+        }
+    }
+
+    private void setStandardWorkflowVisible(boolean visible) {
+        int visibility = visible ? View.VISIBLE : View.GONE;
+        for (View view : standardWorkflowViews) {
+            if (view != null) {
+                view.setVisibility(visibility);
+            }
+        }
+    }
+
+    private void loadSplitHistory(String runcardNo, TextView emptyText) {
+        if (historyCall != null) {
+            historyCall.cancel();
+        }
+        historyCall = api.getSplitHistory(displayOrDash(runcardNo));
+        historyCall.enqueue(new Callback<List<SplitHistoryItem>>() {
+            @Override
+            public void onResponse(
+                    Call<List<SplitHistoryItem>> call,
+                    Response<List<SplitHistoryItem>> response
+            ) {
+                historyCall = null;
+                List<SplitHistoryItem> body = response.body();
+                if (!response.isSuccessful() || body == null || body.isEmpty()) {
+                    historyAdapter.submitRows(Collections.emptyList());
+                    emptyText.setVisibility(View.VISIBLE);
+                    return;
+                }
+
+                List<SplitHistoryRow> rows = new ArrayList<>();
+                for (SplitHistoryItem item : body) {
+                    rows.add(new SplitHistoryRow(
+                            displayOrDash(item.runcard),
+                            displayOrDash(item.assyLot),
+                            item.qty == null ? "-" : String.valueOf(item.qty),
+                            displayOrDash(item.mother),
+                            item.motherQty == null ? "-" : String.valueOf(item.motherQty),
+                            displayOrDash(item.wc),
+                            displayOrDash(item.cdate)
+                    ));
+                }
+                historyAdapter.submitRows(rows);
+                emptyText.setVisibility(View.GONE);
+            }
+
+            @Override
+            public void onFailure(Call<List<SplitHistoryItem>> call, Throwable throwable) {
+                if (call.isCanceled()) {
+                    return;
+                }
+                historyCall = null;
+                historyAdapter.submitRows(Collections.emptyList());
+                emptyText.setVisibility(View.VISIBLE);
+                Toast.makeText(context, "Unable to load split history", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void updateSplitQtyState(ProductionDetail detail) {
+        if (detail == null) {
+            confirmButton.setEnabled(false);
+            remainingMotherQtyValue.setText("-");
+            return;
+        }
+
+        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
+        hideValidationMessage();
+
+        int motherQty = parseIntOrZero(detail.rcQuantity);
+        String qtyText = newQtyInput.getText().toString().trim();
+        if (TextUtils.isEmpty(qtyText)) {
+            confirmButton.setEnabled(false);
+            remainingMotherQtyValue.setText(String.valueOf(motherQty));
+            remainingMotherQtyValue.setTextColor(color(R.color.link_blue));
+            return;
+        }
+
+        int splitQty;
+        try {
+            splitQty = Integer.parseInt(qtyText);
+        } catch (NumberFormatException ex) {
+            confirmButton.setEnabled(false);
+            remainingMotherQtyValue.setText("-");
+            remainingMotherQtyValue.setTextColor(color(R.color.danger));
+            return;
+        }
+
+        int remaining = motherQty - splitQty;
+        remainingMotherQtyValue.setText(String.valueOf(remaining));
+        if (splitQty <= 0) {
+            confirmButton.setEnabled(false);
+            remainingMotherQtyValue.setTextColor(color(R.color.danger));
+            return;
+        }
+        if (motherQty > 0 && splitQty > motherQty) {
+            confirmButton.setEnabled(false);
+            remainingMotherQtyValue.setTextColor(color(R.color.danger));
+            return;
+        }
+
+        remainingMotherQtyValue.setTextColor(color(R.color.link_blue));
+        confirmButton.setEnabled(true);
+    }
+
+    private void submitSplit(
+            ProductionDetail detail,
+            EditText qtyInput,
+            Button addButton,
+            TextView historyEmptyText
+    ) {
         String qtyText = qtyInput.getText().toString().trim();
         if (TextUtils.isEmpty(qtyText)) {
             qtyInput.setError("New Qty is required");
@@ -141,13 +313,15 @@ final class SplitMergeManager implements ActionButtonModule {
         }
 
         int motherQty = parseIntOrZero(detail.rcQuantity);
-        if (splitQty <= 0 || (motherQty > 0 && splitQty >= motherQty)) {
-            qtyInput.setError("New Qty must be greater than 0 and less than current Qty");
+        if (splitQty <= 0 || (motherQty > 0 && splitQty > motherQty)) {
+            qtyInput.setError("Split Qty must be greater than 0 and not exceed Mother QTY");
             qtyInput.requestFocus();
+            updateSplitQtyState(detail);
             return;
         }
 
         addButton.setEnabled(false);
+        hideValidationMessage();
         SplitRequest request = new SplitRequest(
                 displayOrDash(detail.workOrder),
                 displayOrDash(detail.material),
@@ -160,6 +334,54 @@ final class SplitMergeManager implements ActionButtonModule {
                 inferCustomerType(detail)
         );
 
+        if (validationCall != null) {
+            validationCall.cancel();
+        }
+        validationCall = api.validateRuncard(request.motherRuncard, request.workCenter);
+        validationCall.enqueue(new Callback<ValidationResponse>() {
+            @Override
+            public void onResponse(Call<ValidationResponse> call, Response<ValidationResponse> response) {
+                validationCall = null;
+                ValidationResponse body = response.body();
+                if (!response.isSuccessful() || body == null) {
+                    addButton.setEnabled(true);
+                    showValidationErrors(Collections.singletonList("Validation failed: HTTP " + response.code()));
+                    updateSplitQtyState(detail);
+                    return;
+                }
+
+                if (!body.isValid) {
+                    addButton.setEnabled(true);
+                    showValidationErrors(body.errorMessages == null
+                            ? Collections.singletonList("Runcard validation failed.")
+                            : body.errorMessages);
+                    updateSplitQtyState(detail);
+                    return;
+                }
+
+                executeSplit(detail, request, addButton, historyEmptyText);
+            }
+
+            @Override
+            public void onFailure(Call<ValidationResponse> call, Throwable throwable) {
+                if (call.isCanceled()) {
+                    return;
+                }
+                validationCall = null;
+                addButton.setEnabled(true);
+                showValidationErrors(Collections.singletonList("Validation failed: "
+                        + (throwable.getMessage() == null ? "Unable to connect to backend" : throwable.getMessage())));
+                updateSplitQtyState(detail);
+            }
+        });
+    }
+
+    private void executeSplit(
+            ProductionDetail detail,
+            SplitRequest request,
+            Button addButton,
+            TextView historyEmptyText
+    ) {
         if (splitCall != null) {
             splitCall.cancel();
         }
@@ -185,8 +407,9 @@ final class SplitMergeManager implements ActionButtonModule {
                         displayOrDash(body.workCenter),
                         displayOrDash(body.cdate)
                 ));
+                historyEmptyText.setVisibility(View.GONE);
                 callback.onSplitSucceeded(body.newRuncard);
-                dialog.dismiss();
+                closeSplit();
             }
 
             @Override
@@ -205,6 +428,21 @@ final class SplitMergeManager implements ActionButtonModule {
                 ).show();
             }
         });
+    }
+
+    private void showValidationErrors(java.util.List<String> errorMessages) {
+        String message = TextUtils.join("\n", errorMessages);
+        validationMessage.setText(TextUtils.isEmpty(message) ? "Runcard validation failed." : message);
+        validationMessage.setVisibility(View.VISIBLE);
+    }
+
+    private void hideValidationMessage() {
+        validationMessage.setText("");
+        validationMessage.setVisibility(View.GONE);
+    }
+
+    private int color(int colorRes) {
+        return context.getResources().getColor(colorRes, context.getTheme());
     }
 
     private void openMerge() {

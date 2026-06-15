@@ -5,42 +5,59 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/industrial_bg"
+    android:background="#F4F9FD"
     android:focusable="true"
     android:focusableInTouchMode="true"
     tools:context=".MainActivity">
 
     <LinearLayout
-        android:id="@+id/stepper"
+        android:id="@+id/miniHeader"
         android:layout_width="0dp"
-        android:layout_height="72dp"
-        android:gravity="center"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_panel"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="10dp"
+        android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
         <TextView
-            android:id="@+id/stepScan"
-            style="@style/WorkflowStep"
-            android:text="1. Scan" />
+            android:id="@+id/miniHeaderUserValue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:text="USER: -"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/stepVerify"
-            style="@style/WorkflowStep"
-            android:text="2. Verify" />
+            android:id="@+id/miniHeaderMachineValue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:text="MC: -"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/stepInput"
-            style="@style/WorkflowStep"
-            android:text="3. Input Qty" />
-
-        <TextView
-            android:id="@+id/stepSummary"
-            style="@style/WorkflowStep"
-            android:text="4. Summary" />
+            android:id="@+id/miniHeaderRuncardValue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1.25"
+            android:singleLine="true"
+            android:text="RC: -"
+            android:textColor="@color/link_blue"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <ScrollView
@@ -50,7 +67,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/stepper">
+        app:layout_constraintTop_toBottomOf="@id/miniHeader">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -62,83 +79,159 @@
                 android:id="@+id/scanPanel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_panel"
-                android:orientation="vertical">
+                android:background="@android:color/transparent"
+                android:orientation="vertical"
+                android:paddingTop="18dp">
 
-                <TextView
+                <LinearLayout
+                    android:id="@+id/scanSessionHeader"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="SEQUENTIAL SCAN WORKFLOW"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/scannerStatus"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_scan_target"
                     android:gravity="center"
-                    android:minHeight="64dp"
-                    android:text="Ready for User, Machine, or Runcard scan"
-                    android:textColor="@color/teal_dark"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.01"
+                        android:text="Start"
+                        android:textColor="@color/text_primary"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:fontFamily="sans-serif-light"
+                        android:letterSpacing="0.01"
+                        android:text="Scanning Session"
+                        android:textColor="@color/link_blue"
+                        android:textSize="28sp" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="24dp"
                     android:orientation="vertical">
 
-                    <TextView
-                        style="@style/WorkflowLabel"
-                        android:text="User ID" />
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/userInputLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="User ID"
+                        app:boxBackgroundColor="@color/panel_bg"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusBottomEnd="28dp"
+                        app:boxCornerRadiusBottomStart="28dp"
+                        app:boxCornerRadiusTopEnd="28dp"
+                        app:boxCornerRadiusTopStart="28dp"
+                        app:boxStrokeColor="@color/link_blue"
+                        app:boxStrokeWidth="1dp"
+                        app:boxStrokeWidthFocused="2dp"
+                        app:hintEnabled="true"
+                        app:hintTextColor="@color/link_blue"
+                        app:startIconDrawable="@drawable/ic_scan_user"
+                        app:startIconTint="@color/link_blue">
 
-                    <EditText
-                        android:id="@+id/userIdInput"
-                        style="@style/WorkflowValue"
-                        android:hint="Scan or type User ID"
-                        android:imeOptions="actionNext"
-                        android:inputType="textCapCharacters|textNoSuggestions"
-                        android:singleLine="true" />
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/userIdInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:fontFamily="sans-serif"
+                            android:imeOptions="actionNext"
+                            android:inputType="textCapCharacters|textNoSuggestions"
+                            android:paddingEnd="18dp"
+                            android:singleLine="true"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_secondary"
+                            android:textSize="18sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <TextView
-                        style="@style/WorkflowLabel"
-                        android:layout_marginTop="8dp"
-                        android:text="Machine" />
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/machineInputLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Machine"
+                        app:boxBackgroundColor="@color/panel_bg"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusBottomEnd="28dp"
+                        app:boxCornerRadiusBottomStart="28dp"
+                        app:boxCornerRadiusTopEnd="28dp"
+                        app:boxCornerRadiusTopStart="28dp"
+                        app:boxStrokeColor="@color/link_blue"
+                        app:boxStrokeWidth="1dp"
+                        app:boxStrokeWidthFocused="2dp"
+                        app:hintEnabled="true"
+                        app:hintTextColor="@color/link_blue"
+                        app:startIconDrawable="@drawable/ic_scan_factory"
+                        app:startIconTint="@color/link_blue">
 
-                    <EditText
-                        android:id="@+id/machineInput"
-                        style="@style/WorkflowValue"
-                        android:hint="Scan or type Machine"
-                        android:imeOptions="actionNext"
-                        android:inputType="textCapCharacters|textNoSuggestions"
-                        android:singleLine="true" />
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/machineInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:fontFamily="sans-serif"
+                            android:imeOptions="actionNext"
+                            android:inputType="textCapCharacters|textNoSuggestions"
+                            android:paddingEnd="18dp"
+                            android:singleLine="true"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_secondary"
+                            android:textSize="18sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <TextView
-                        style="@style/WorkflowLabel"
-                        android:layout_marginTop="8dp"
-                        android:text="Runcard" />
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/runcardInputLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Runcard Barcode"
+                        app:boxBackgroundColor="@color/panel_bg"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusBottomEnd="28dp"
+                        app:boxCornerRadiusBottomStart="28dp"
+                        app:boxCornerRadiusTopEnd="28dp"
+                        app:boxCornerRadiusTopStart="28dp"
+                        app:boxStrokeColor="@color/link_blue"
+                        app:boxStrokeWidth="1dp"
+                        app:boxStrokeWidthFocused="2dp"
+                        app:hintEnabled="true"
+                        app:hintTextColor="@color/link_blue"
+                        app:startIconDrawable="@drawable/ic_scan_barcode"
+                        app:startIconTint="@color/link_blue">
 
-                    <EditText
-                        android:id="@+id/runcardInput"
-                        style="@style/WorkflowValue"
-                        android:hint="Scan or type Runcard"
-                        android:imeOptions="actionDone"
-                        android:inputType="textCapCharacters|textNoSuggestions"
-                        android:singleLine="true" />
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/runcardInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:fontFamily="sans-serif"
+                            android:imeOptions="actionDone"
+                            android:inputType="textCapCharacters|textNoSuggestions"
+                            android:paddingEnd="18dp"
+                            android:singleLine="true"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_secondary"
+                            android:textSize="18sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/verifyButton"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="18dp"
+                    android:backgroundTint="@color/function_button_active"
                     android:enabled="false"
-                    android:text="VERIFY &amp; PROCEED"
-                    android:textStyle="bold" />
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Verify (ตรวจสอบ)"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="28dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -501,19 +594,30 @@
                     </LinearLayout>
                 </HorizontalScrollView>
 
+                <TextView
+                    android:id="@+id/functionsHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="sans-serif-light"
+                    android:text="Functions (Swipe left/right to explore)"
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+
                 <HorizontalScrollView
                     android:id="@+id/modeButtonsSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="6dp"
                     android:fillViewport="false"
                     android:overScrollMode="ifContentScrolls"
-                    android:scrollbars="horizontal">
+                    android:scrollbars="none">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:orientation="horizontal"
+                        android:paddingEnd="6dp">
 
                         <Button
                             android:id="@+id/checkRuncardButton"
@@ -546,6 +650,11 @@
                             android:text="MERGE/COMBINE" />
 
                         <Button
+                            android:id="@+id/rejectButton"
+                            style="@style/ProductionModeButton"
+                            android:text="REJECT" />
+
+                        <Button
                             android:id="@+id/testButton"
                             style="@style/ProductionModeButton"
                             android:text="TEST" />
@@ -553,289 +662,10 @@
                 </HorizontalScrollView>
 
                 <LinearLayout
-                    android:id="@+id/operTrackingSection"
+                    android:id="@+id/inlinePanelsContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="OPER TRACKING"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:fillViewport="false"
-                        android:overScrollMode="ifContentScrolls"
-                        android:scrollbars="horizontal">
-
-                    <LinearLayout
-                        android:id="@+id/operRowsTable"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="64dp"
-                                android:text="OPER" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="72dp"
-                                android:text="WC" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="248dp"
-                                android:text="DESCRIPTION" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="140dp"
-                                android:text="WorkCenter" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:text="RECEIVE" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:text="YIELD" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:text="SCRAP" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:text="MOVE" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:text="% YIELD" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="156dp"
-                                android:text="RECEIVE DATE" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="156dp"
-                                android:text="CONFIRM DATE" />
-
-                            <TextView
-                                style="@style/OperHeaderCell"
-                                android:layout_width="72dp"
-                                android:text="EN" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="64dp"
-                                android:text="001" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="WC01" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="248dp"
-                                android:text="KIT PULL GENERATION"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="140dp"
-                                android:text="SMT LINE 01" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="1" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/kitPullReceiveDateValue"
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="-" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="64dp"
-                                android:text="010" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="WC01" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="248dp"
-                                android:text="PRODUCTION INPUT QTY" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="140dp"
-                                android:text="SMT LINE 01" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/operYieldValue"
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/operScrapValue"
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/operPercentYieldValue"
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="-" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="64dp"
-                                android:text="999" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="248dp"
-                                android:text="* SUMMARY"
-                                android:textColor="@color/link_blue"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="140dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/summaryPostingDateValue"
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                android:id="@+id/summaryConfirmDateValue"
-                                style="@style/OperBodyCell"
-                                android:layout_width="156dp"
-                                android:text="-" />
-
-                            <TextView
-                                style="@style/OperBodyCell"
-                                android:layout_width="72dp"
-                                android:text="-" />
-                        </LinearLayout>
-                    </LinearLayout>
-                    </HorizontalScrollView>
-                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/checkRuncardPanel"
@@ -1144,6 +974,20 @@
                         android:background="@drawable/bg_value_box"
                         android:paddingHorizontal="8dp" />
 
+                    <EditText
+                        android:id="@+id/edtReleaseHoldComment"
+                        android:layout_width="match_parent"
+                        android:layout_height="86dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_value_box"
+                        android:gravity="top|start"
+                        android:hint="Release Comment"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:maxLines="4"
+                        android:padding="10dp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
                     <Button
                         android:id="@+id/holdRuncardButton"
                         android:layout_width="match_parent"
@@ -1152,62 +996,86 @@
                         android:text="HOLD RUNCARD"
                         android:textStyle="bold" />
 
-                    <EditText
-                        android:id="@+id/edtReleaseHoldComment"
-                        android:layout_width="match_parent"
-                        android:layout_height="86dp"
-                        android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_value_box"
-                        android:gravity="top|start"
-                        android:hint="RELEASE HOLD Comment [English only]"
-                        android:inputType="textMultiLine|textCapSentences"
-                        android:maxLines="4"
-                        android:padding="10dp"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:visibility="gone" />
-
                     <Button
                         android:id="@+id/releaseHoldRuncardButton"
                         android:layout_width="match_parent"
                         android:layout_height="50dp"
                         android:layout_marginTop="10dp"
-                        android:text="RELEASE HOLD RUNCARD"
+                        android:backgroundTint="@color/teal_dark"
+                        android:text="Release Runcard"
+                        android:textColor="@color/white"
                         android:textStyle="bold"
-                        android:visibility="gone" />
+                        android:textAllCaps="false" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/goodQtyLabel"
-                    style="@style/WorkflowLabel"
+                <include layout="@layout/layout_split_function" />
+
+                <include layout="@layout/layout_merge_function" />
+
+                <include layout="@layout/layout_scrap_function" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/qtyInputRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Good QTY" />
+                    android:orientation="horizontal">
 
-                <EditText
-                    android:id="@+id/goodQtyInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="54dp"
-                    android:background="@drawable/bg_value_box"
-                    android:imeOptions="actionNext"
-                    android:inputType="number"
-                    android:paddingHorizontal="12dp"
-                    android:textSize="20sp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/scrapQtyLabel"
-                    style="@style/WorkflowLabel"
-                    android:layout_marginTop="8dp"
-                    android:text="Scrap QTY" />
+                        <TextView
+                            android:id="@+id/goodQtyLabel"
+                            style="@style/WorkflowLabel"
+                            android:text="Good QTY" />
 
-                <EditText
-                    android:id="@+id/scrapQtyInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="54dp"
-                    android:background="@drawable/bg_value_box"
-                    android:imeOptions="actionDone"
-                    android:inputType="number"
-                    android:paddingHorizontal="12dp"
-                    android:textSize="20sp" />
+                        <EditText
+                            android:id="@+id/goodQtyInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="54dp"
+                            android:background="@drawable/bg_value_box"
+                            android:imeOptions="actionNext"
+                            android:inputType="number"
+                            android:paddingHorizontal="12dp"
+                            android:textColor="@color/black"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/scrapQtyLabel"
+                            style="@style/WorkflowLabel"
+                            android:text="Scrap / Reject QTY" />
+
+                        <EditText
+                            android:id="@+id/scrapQtyInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="54dp"
+                            android:background="@drawable/bg_value_box"
+                            android:clickable="true"
+                            android:focusable="false"
+                            android:hint="Tap Reject"
+                            android:imeOptions="actionDone"
+                            android:inputType="none"
+                            android:paddingHorizontal="12dp"
+                            android:textColor="@color/black"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/timestampValue"
@@ -1219,22 +1087,358 @@
                     android:textSize="14sp"
                     tools:text="Start: 2026-05-27 09:30:00\nFinish: -\nPosting: -" />
 
-                <Button
-                    android:id="@+id/summaryButton"
+                <LinearLayout
+                    android:id="@+id/operTrackingSection"
                     android:layout_width="match_parent"
-                    android:layout_height="54dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="GO TO SUMMARY"
-                    android:textStyle="bold" />
+                    android:orientation="vertical">
 
-                <Button
-                    android:id="@+id/saveButton"
+                    <TextView
+                        android:id="@+id/operTrackingToggle"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_info_cell"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="10dp"
+                        android:text="&#9660; OPER TRACKING"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fillViewport="false"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="64dp"
+                                android:text="OPER" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="72dp"
+                                android:text="WC" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="248dp"
+                                android:text="DESCRIPTION" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="140dp"
+                                android:text="WorkCenter" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:text="RECEIVE" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:text="YIELD" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:text="SCRAP" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:text="MOVE" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:text="% YIELD" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="156dp"
+                                android:text="RECEIVE DATE" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="156dp"
+                                android:text="CONFIRM DATE" />
+
+                            <TextView
+                                style="@style/OperHeaderCell"
+                                android:layout_width="72dp"
+                                android:text="EN" />
+                        </LinearLayout>
+
+                        <androidx.core.widget.NestedScrollView
+                            android:id="@+id/operTrackingTableContainer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="360dp"
+                            android:fillViewport="true"
+                            android:overScrollMode="ifContentScrolls"
+                            android:scrollbars="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/operRowsTable"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="64dp"
+                                android:text="001" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:text="WC01" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="248dp"
+                                android:text="KIT PULL GENERATION"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="140dp"
+                                android:text="SMT LINE 01" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="1" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/kitPullReceiveDateValue"
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:text="-" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="64dp"
+                                android:text="010" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:text="WC01" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="248dp"
+                                android:text="PRODUCTION INPUT QTY" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="140dp"
+                                android:text="SMT LINE 01" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/operYieldValue"
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/operScrapValue"
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/operPercentYieldValue"
+                                style="@style/OperBodyCell"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:text="-" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="64dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="999" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="248dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:text="* SUMMARY"
+                                android:textColor="@color/summary_magenta"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="140dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/summaryPostingDateValue"
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                android:id="@+id/summaryConfirmDateValue"
+                                style="@style/OperBodyCell"
+                                android:layout_width="156dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+
+                            <TextView
+                                style="@style/OperBodyCell"
+                                android:layout_width="72dp"
+                                android:background="@drawable/bg_oper_summary_cell"
+                                android:textStyle="bold"
+                                android:text="-" />
+                        </LinearLayout>
+                    </LinearLayout>
+                    </androidx.core.widget.NestedScrollView>
+                    </LinearLayout>
+                    </HorizontalScrollView>
+                </LinearLayout>
+
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:layout_marginTop="8dp"
-                    android:enabled="false"
-                    android:text="SAVE CONFIRM"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/saveButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:enabled="false"
+                        android:text="SAVE CONFIRM"
+                        android:textStyle="bold" />
+
+                    <ProgressBar
+                        android:id="@+id/saveProgressBar"
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginEnd="18dp"
+                        android:indeterminate="true"
+                        android:visibility="gone" />
+                </FrameLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
