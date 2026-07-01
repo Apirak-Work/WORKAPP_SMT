@@ -1,5 +1,7 @@
 package com.example.smt;
 
+import com.example.smt.network.ApiConfig;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,7 +11,8 @@ final class ProductionRepository {
         void onSuccess(
                 ProductionDetail detail,
                 List<OperTrackingRow> operRows,
-                ProductionApiClient.ValidateScanResult validation
+                ProductionApiClient.ValidateScanResult validation,
+                ProductionApiClient.EmployeeProfileResult employeeProfile
         );
 
         void onError(String message);
@@ -32,12 +35,14 @@ final class ProductionRepository {
     ) {
         executor.execute(() -> {
             try {
+                ProductionApiClient.EmployeeProfileResult employeeProfile = apiClient.verifyEmployee(userId);
                 ProductionDetail detail = apiClient.getProductionDetail(runcardNo);
                 List<OperTrackingRow> operRows = apiClient.getOperTracking(runcardNo);
                 ProductionApiClient.ValidateScanResult validation = apiClient.validateScan(userId, machineId, runcardNo);
-                callback.onSuccess(detail, operRows, validation);
+                callback.onSuccess(detail, operRows, validation, employeeProfile);
             } catch (Exception e) {
-                callback.onError(e.getMessage() == null ? "Unable to load production data" : e.getMessage());
+                String message = e.getMessage() == null ? "Unable to load production data" : e.getMessage();
+                callback.onError(message.contains("HTTP 404") ? "User not found" : message);
             }
         });
     }
@@ -46,8 +51,12 @@ final class ProductionRepository {
             String userId,
             String machineId,
             String runcardNo,
+            ProductionDetail detail,
+            OperTrackingRow activeRow,
             int goodQty,
             int scrapQty,
+            String workCenter,
+            String operation,
             long startDateMillis,
             long finishDateMillis,
             long postingDateMillis,
@@ -59,8 +68,12 @@ final class ProductionRepository {
                         userId,
                         machineId,
                         runcardNo,
+                        detail,
+                        activeRow,
                         goodQty,
                         scrapQty,
+                        workCenter,
+                        operation,
                         startDateMillis,
                         finishDateMillis,
                         postingDateMillis

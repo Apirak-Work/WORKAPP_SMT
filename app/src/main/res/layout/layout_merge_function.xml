@@ -26,7 +26,7 @@
                 android:layout_height="wrap_content"
                 android:text="MERGE / COMBINE"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -35,8 +35,9 @@
                 android:layout_marginTop="2dp"
                 android:text="Add source runcards into one main runcard"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
 
         <Button
@@ -80,18 +81,15 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/mergeSourceRuncardInput"
+        <Spinner
+            android:id="@+id/mergeSourceRuncardSpinner"
             android:layout_width="0dp"
             android:layout_height="46dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_value_box"
-            android:hint="Scan source runcard"
-            android:inputType="textCapCharacters|textNoSuggestions"
-            android:paddingHorizontal="10dp"
-            android:singleLine="true"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            android:background="@drawable/bg_spinner_dropdown"
+            android:paddingStart="10dp"
+            android:paddingEnd="40dp"
+            android:spinnerMode="dropdown" />
 
         <Button
             android:id="@+id/mergeAddSourceButton"
@@ -150,7 +148,7 @@
                 android:gravity="center"
                 android:text="No source runcards added"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </FrameLayout>
     </LinearLayout>

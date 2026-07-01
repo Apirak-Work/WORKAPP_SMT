@@ -1,9 +1,12 @@
 package com.example.smt;
 
-final class HoldRequest {
+public final class HoldRequest {
     final String workOrder;
     final String runcard;
     final String material;
+    final String workCenter;
+    final String operation;
+    final String cby;
     final String selectReason;
     final String topicDamage;
     final String holdComment;
@@ -14,6 +17,9 @@ final class HoldRequest {
             String workOrder,
             String runcard,
             String material,
+            String workCenter,
+            String operation,
+            String cby,
             String selectReason,
             String topicDamage,
             String holdComment,
@@ -23,6 +29,9 @@ final class HoldRequest {
         this.workOrder = workOrder;
         this.runcard = runcard;
         this.material = material;
+        this.workCenter = workCenter;
+        this.operation = operation;
+        this.cby = cby;
         this.selectReason = selectReason;
         this.topicDamage = topicDamage;
         this.holdComment = holdComment;

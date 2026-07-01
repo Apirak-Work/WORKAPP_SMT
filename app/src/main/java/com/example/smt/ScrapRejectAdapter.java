@@ -3,7 +3,7 @@ package com.example.smt;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -56,7 +56,7 @@ final class ScrapRejectAdapter extends RecyclerView.Adapter<ScrapRejectAdapter.V
         final TextView code;
         final TextView description;
         final TextView qty;
-        final Button deleteButton;
+        final ImageButton deleteButton;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);

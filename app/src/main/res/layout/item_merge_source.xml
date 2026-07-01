@@ -14,4 +14,13 @@
         android:id="@+id/mergeSourceQtyCell"
         style="@style/OperBodyCell"
         android:layout_width="96dp" />
+
+    <ImageButton
+        android:id="@+id/mergeSourceDeleteButton"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Remove source runcard"
+        android:padding="10dp"
+        android:src="@drawable/ic_trash" />
 </LinearLayout>

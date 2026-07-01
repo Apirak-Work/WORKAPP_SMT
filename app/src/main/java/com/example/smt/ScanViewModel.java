@@ -33,6 +33,8 @@ public class ScanViewModel extends ViewModel {
         final WorkflowStep step;
         final CurrentScanState scanState;
         final String userId;
+        final String employeeName;
+        final String employeePosition;
         final String machineId;
         final String runcard;
         final String scannerMessage;
@@ -60,6 +62,8 @@ public class ScanViewModel extends ViewModel {
                 WorkflowStep step,
                 CurrentScanState scanState,
                 String userId,
+                String employeeName,
+                String employeePosition,
                 String machineId,
                 String runcard,
                 String scannerMessage,
@@ -86,6 +90,8 @@ public class ScanViewModel extends ViewModel {
             this.step = step;
             this.scanState = scanState;
             this.userId = userId;
+            this.employeeName = employeeName;
+            this.employeePosition = employeePosition;
             this.machineId = machineId;
             this.runcard = runcard;
             this.scannerMessage = scannerMessage;
@@ -112,7 +118,7 @@ public class ScanViewModel extends ViewModel {
     }
 
     private static final long COUNTDOWN_MS = 3000L;
-    private static final Pattern USER_PATTERN = Pattern.compile("^EN[A-Z0-9-]{1,}$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USER_PATTERN = Pattern.compile("^\\d{4,10}$");
     private static final Pattern MACHINE_PATTERN = Pattern.compile("^MC[A-Z0-9-]{1,}$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RUNCARD_PATTERN = Pattern.compile("^\\d{10}$");
 
@@ -124,6 +130,8 @@ public class ScanViewModel extends ViewModel {
     private WorkflowStep step = WorkflowStep.SCAN;
     private CurrentScanState scanState = CurrentScanState.USER;
     private String userId = "";
+    private String employeeName = "";
+    private String employeePosition = "";
     private String machineId = "";
     private String runcard = "";
     private String scannerMessage = "Scan or enter User ID";
@@ -174,6 +182,8 @@ public class ScanViewModel extends ViewModel {
         switch (targetState) {
             case USER:
                 userId = value;
+                employeeName = "";
+                employeePosition = "";
                 scanState = CurrentScanState.MACHINE;
                 scannerMessage = "User captured. Scan or enter Machine";
                 break;
@@ -202,6 +212,8 @@ public class ScanViewModel extends ViewModel {
         switch (targetState) {
             case USER:
                 userId = value;
+                employeeName = "";
+                employeePosition = "";
                 break;
             case MACHINE:
                 machineId = value;
@@ -307,6 +319,35 @@ public class ScanViewModel extends ViewModel {
         publish(false, false);
     }
 
+    void resetToInitialState() {
+        cancelTimer(verifyTimer);
+        cancelTimer(saveTimer);
+        step = WorkflowStep.SCAN;
+        scanState = CurrentScanState.USER;
+        userId = "";
+        employeeName = "";
+        employeePosition = "";
+        machineId = "";
+        runcard = "";
+        scannerMessage = "Scan or enter User ID";
+        verifyButtonText = "VERIFY & PROCEED";
+        verifyCountdownRunning = false;
+        verifyReady = false;
+        scanValidated = false;
+        saveCountdownRunning = false;
+        saveButtonText = "SAVE CONFIRM";
+        goodQty = "";
+        scrapQty = "";
+        startDateMillis = 0L;
+        finishDateMillis = 0L;
+        postingDateMillis = 0L;
+        productionDataLoading = false;
+        productionDataError = "";
+        productionDetail = null;
+        operRows = new ArrayList<>();
+        publish(false, false);
+    }
+
     String formatTimestamp(long millis) {
         if (millis == 0L) {
             return "-";
@@ -396,6 +437,7 @@ public class ScanViewModel extends ViewModel {
     }
 
     private void loadProductionData(String runcardNo) {
+        final String requestedRuncard = runcardNo == null ? "" : runcardNo.trim();
         productionDataLoading = true;
         productionDataError = "";
         productionDetail = null;
@@ -409,8 +451,14 @@ public class ScanViewModel extends ViewModel {
             public void onSuccess(
                     ProductionDetail detail,
                     List<OperTrackingRow> rows,
-                    ProductionApiClient.ValidateScanResult validation
+                    ProductionApiClient.ValidateScanResult validation,
+                    ProductionApiClient.EmployeeProfileResult employeeProfile
             ) {
+                if (!requestedRuncard.equals(runcard)) {
+                    return;
+                }
+                employeeName = employeeProfile == null ? "" : employeeProfile.empName;
+                employeePosition = employeeProfile == null ? "" : employeeProfile.position;
                 productionDataLoading = false;
                 productionDetail = detail;
                 operRows = rows == null ? new ArrayList<>() : rows;
@@ -437,12 +485,15 @@ public class ScanViewModel extends ViewModel {
 
             @Override
             public void onError(String message) {
+                if (!requestedRuncard.equals(runcard)) {
+                    return;
+                }
                 productionDataLoading = false;
                 productionDataError = message == null ? "Unable to load production data" : message;
                 scannerMessage = "Backend failed: " + productionDataError;
                 scanValidated = false;
-                verifyReady = false;
-                verifyButtonText = "VERIFY LOCKED";
+                verifyReady = true;
+                verifyButtonText = "VERIFY";
                 cancelTimer(verifyTimer);
                 verifyCountdownRunning = false;
                 publish(false, false);
@@ -453,12 +504,17 @@ public class ScanViewModel extends ViewModel {
     private void saveProduction() {
         int goodQtyNumber = parseQty(goodQty);
         int scrapQtyNumber = parseQty(scrapQty);
+        OperTrackingRow activeRow = activeOperRow();
         productionRepository.saveProduction(
                 userId,
                 machineId,
                 runcard,
+                productionDetail,
+                activeRow,
                 goodQtyNumber,
                 scrapQtyNumber,
+                activeRow == null ? "" : displayOrDash(activeRow.wc),
+                activeRow == null ? "" : displayOrDash(activeRow.oper),
                 startDateMillis,
                 finishDateMillis,
                 postingDateMillis,
@@ -494,6 +550,8 @@ public class ScanViewModel extends ViewModel {
         step = WorkflowStep.SCAN;
         scanState = CurrentScanState.USER;
         userId = "";
+        employeeName = "";
+        employeePosition = "";
         machineId = "";
         runcard = "";
         scannerMessage = "Production Confirmed. Scan or enter User ID";
@@ -527,8 +585,11 @@ public class ScanViewModel extends ViewModel {
             public void onSuccess(
                     ProductionDetail detail,
                     List<OperTrackingRow> rows,
-                    ProductionApiClient.ValidateScanResult validation
+                    ProductionApiClient.ValidateScanResult validation,
+                    ProductionApiClient.EmployeeProfileResult employeeProfile
             ) {
+                employeeName = employeeProfile == null ? "" : employeeProfile.empName;
+                employeePosition = employeeProfile == null ? "" : employeeProfile.position;
                 productionDataLoading = false;
                 productionDetail = detail;
                 operRows = rows == null ? new ArrayList<>() : rows;
@@ -729,7 +790,7 @@ public class ScanViewModel extends ViewModel {
     private String hintForState(CurrentScanState state) {
         switch (state) {
             case USER:
-                return "User ID starting with EN";
+                return "numeric Employee ID";
             case MACHINE:
                 return "Machine starting with MC";
             case RUNCARD:
@@ -750,6 +811,8 @@ public class ScanViewModel extends ViewModel {
                 step,
                 scanState,
                 userId,
+                employeeName,
+                employeePosition,
                 machineId,
                 runcard,
                 scannerMessage,

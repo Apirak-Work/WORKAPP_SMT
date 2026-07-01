@@ -20,14 +20,12 @@
         style="@style/OperBodyCell"
         android:layout_width="78dp" />
 
-    <Button
+    <ImageButton
         android:id="@+id/rejectDeleteButton"
-        android:layout_width="58dp"
+        android:layout_width="42dp"
         android:layout_height="42dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:padding="0dp"
-        android:text="Del"
-        android:textSize="11sp"
-        android:textStyle="bold" />
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Remove reject row"
+        android:padding="10dp"
+        android:src="@drawable/ic_trash" />
 </LinearLayout>

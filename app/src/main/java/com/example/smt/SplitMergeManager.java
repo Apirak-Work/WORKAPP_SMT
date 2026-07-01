@@ -7,11 +7,17 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.smt.network.ProductionRetrofitApi;
+import com.example.smt.network.RetrofitProvider;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -29,6 +35,10 @@ final class SplitMergeManager implements ActionButtonModule {
         ProductionDetail getCurrentProductionDetail();
 
         String getCurrentWorkCenter();
+
+        default String getCurrentOperation() {
+            return "";
+        }
 
         String getCurrentUserId();
 
@@ -52,6 +62,7 @@ final class SplitMergeManager implements ActionButtonModule {
     private final TextView currentRuncard;
     private final TextView currentAssy;
     private final TextView motherQtyValue;
+    private final Spinner customerSpinner;
     private final TextView newRuncardPreview;
     private final TextView newAssyPreview;
     private final EditText newQtyInput;
@@ -83,6 +94,7 @@ final class SplitMergeManager implements ActionButtonModule {
         this.currentRuncard = rootView.findViewById(R.id.splitCurrentRuncard);
         this.currentAssy = rootView.findViewById(R.id.splitCurrentAssy);
         this.motherQtyValue = rootView.findViewById(R.id.splitMotherQtyValue);
+        this.customerSpinner = rootView.findViewById(R.id.splitCustomerSpinner);
         this.newRuncardPreview = rootView.findViewById(R.id.splitNewRuncardPreview);
         this.newAssyPreview = rootView.findViewById(R.id.splitNewAssyPreview);
         this.newQtyInput = rootView.findViewById(R.id.splitNewQtyInput);
@@ -103,6 +115,7 @@ final class SplitMergeManager implements ActionButtonModule {
         historyRecyclerView.setLayoutManager(new LinearLayoutManager(context));
         historyRecyclerView.setAdapter(historyAdapter);
         historyEmptyText.setVisibility(View.VISIBLE);
+        setupCustomerSpinner();
 
         closeButton.setOnClickListener(v -> closeSplit());
         newQtyInput.addTextChangedListener(new TextWatcher() {
@@ -118,6 +131,31 @@ final class SplitMergeManager implements ActionButtonModule {
             public void afterTextChanged(Editable editable) {
                 ProductionDetail detail = callback.getCurrentProductionDetail();
                 updateSplitQtyState(detail);
+            }
+        });
+    }
+
+    private void setupCustomerSpinner() {
+        ArrayAdapter<String> customerAdapter = new ArrayAdapter<>(
+                context,
+                android.R.layout.simple_spinner_item,
+                new String[]{"Microchip", "onsemi"}
+        );
+        customerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        customerSpinner.setAdapter(customerAdapter);
+        customerSpinner.setSelection(0);
+        customerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                ProductionDetail detail = callback.getCurrentProductionDetail();
+                if (detail != null) {
+                    newAssyPreview.setText(generateClientAssyPreview(detail.assyLot, getSelectedCustomerType()));
+                    updateSplitQtyState(detail);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
             }
         });
     }
@@ -139,7 +177,8 @@ final class SplitMergeManager implements ActionButtonModule {
         currentAssy.setText(displayOrDash(detail.assyLot));
         motherQtyValue.setText(displayOrDash(detail.rcQuantity));
         newRuncardPreview.setText(generateClientRuncardPreview());
-        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
+        customerSpinner.setSelection(0);
+        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot, getSelectedCustomerType()));
         remainingMotherQtyValue.setText(displayOrDash(detail.rcQuantity));
         remainingMotherQtyValue.setTextColor(color(R.color.link_blue));
         updateSplitQtyState(detail);
@@ -251,7 +290,7 @@ final class SplitMergeManager implements ActionButtonModule {
             return;
         }
 
-        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot));
+        newAssyPreview.setText(generateClientAssyPreview(detail.assyLot, getSelectedCustomerType()));
         hideValidationMessage();
 
         int motherQty = parseIntOrZero(detail.rcQuantity);
@@ -275,12 +314,9 @@ final class SplitMergeManager implements ActionButtonModule {
 
         int remaining = motherQty - splitQty;
         remainingMotherQtyValue.setText(String.valueOf(remaining));
-        if (splitQty <= 0) {
-            confirmButton.setEnabled(false);
-            remainingMotherQtyValue.setTextColor(color(R.color.danger));
-            return;
-        }
-        if (motherQty > 0 && splitQty > motherQty) {
+        // Valid only when split is positive and strictly less than a known-positive mother qty.
+        // A mother qty <= 0 (missing/unparseable) is treated as invalid so the mother can never hit 0.
+        if (splitQty <= 0 || motherQty <= 0 || splitQty >= motherQty) {
             confirmButton.setEnabled(false);
             remainingMotherQtyValue.setTextColor(color(R.color.danger));
             return;
@@ -313,8 +349,8 @@ final class SplitMergeManager implements ActionButtonModule {
         }
 
         int motherQty = parseIntOrZero(detail.rcQuantity);
-        if (splitQty <= 0 || (motherQty > 0 && splitQty > motherQty)) {
-            qtyInput.setError("Split Qty must be greater than 0 and not exceed Mother QTY");
+        if (splitQty <= 0 || motherQty <= 0 || splitQty >= motherQty) {
+            qtyInput.setError("Split Qty must be greater than 0 and less than Mother QTY");
             qtyInput.requestFocus();
             updateSplitQtyState(detail);
             return;
@@ -330,8 +366,9 @@ final class SplitMergeManager implements ActionButtonModule {
                 splitQty,
                 motherQty,
                 displayOrDash(callback.getCurrentWorkCenter()),
+                displayOrDash(callback.getCurrentOperation()),
                 displayOrDash(callback.getCurrentUserId()),
-                inferCustomerType(detail)
+                getSelectedCustomerType()
         );
 
         if (validationCall != null) {
@@ -453,24 +490,25 @@ final class SplitMergeManager implements ActionButtonModule {
         Toast.makeText(context, "MERGE/COMBINE module ready", Toast.LENGTH_SHORT).show();
     }
 
-    private String inferCustomerType(ProductionDetail detail) {
-        String assy = detail.assyLot == null ? "" : detail.assyLot.toUpperCase(Locale.US);
-        if (assy.startsWith("S4") || assy.startsWith("S5")) {
-            return "onsemi";
-        }
-        return "microchip";
+    private String getSelectedCustomerType() {
+        Object selected = customerSpinner.getSelectedItem();
+        String value = selected == null ? "Microchip" : selected.toString();
+        return value.equalsIgnoreCase("onsemi") ? "onsemi" : "microchip";
     }
 
     private String generateClientRuncardPreview() {
         return new SimpleDateFormat("yyMMdd", Locale.US).format(new Date()) + "XXXX";
     }
 
-    private String generateClientAssyPreview(String motherAssy) {
+    private String generateClientAssyPreview(String motherAssy, String customerType) {
         String base = displayOrDash(motherAssy);
-        if (base.startsWith("S4")) {
+        if ("onsemi".equalsIgnoreCase(customerType) && base.startsWith("S4")) {
             base = "S5" + base.substring(2);
         }
-        return base + "A";
+        if ("onsemi".equalsIgnoreCase(customerType)) {
+            return base + "A";
+        }
+        return "-".equals(base) ? "CHILDA" : base + "-A";
     }
 
     private int parseIntOrZero(String value) {

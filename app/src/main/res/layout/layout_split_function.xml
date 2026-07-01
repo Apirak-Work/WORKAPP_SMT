@@ -26,7 +26,7 @@
                 android:layout_height="wrap_content"
                 android:text="SPLIT FUNCTION"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -35,8 +35,9 @@
                 android:layout_marginTop="2dp"
                 android:text="Create child runcard from current lot"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
 
         <Button
@@ -63,7 +64,7 @@
             style="@style/WorkflowLabel"
             android:text="CURRENT DATA"
             android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -145,7 +146,21 @@
             style="@style/WorkflowLabel"
             android:text="NEW DATA"
             android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:textSize="11sp" />
+
+        <TextView
+            style="@style/WorkflowLabel"
+            android:layout_marginTop="8dp"
+            android:text="Lot Owner" />
+
+        <Spinner
+            android:id="@+id/splitCustomerSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_spinner_dropdown"
+            android:paddingStart="10dp"
+            android:paddingEnd="40dp"
+            android:spinnerMode="dropdown" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -209,6 +224,9 @@
             android:layout_width="match_parent"
             android:layout_height="46dp"
             android:background="@drawable/bg_value_box"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:hint="Split Qty"
             android:inputType="number"
             android:paddingHorizontal="10dp"
@@ -331,7 +349,7 @@
             android:gravity="center"
             android:text="No data available in table"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </FrameLayout>
 

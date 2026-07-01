@@ -1,6 +1,6 @@
 package com.example.smt;
 
-final class SplitResponse {
+public final class SplitResponse {
     boolean success;
     String message;
     String newRuncard;

@@ -1,6 +1,6 @@
 package com.example.smt;
 
-final class SplitRequest {
+public final class SplitRequest {
     final String workOrder;
     final String material;
     final String motherRuncard;
@@ -8,8 +8,11 @@ final class SplitRequest {
     final int splitQty;
     final int motherQty;
     final String workCenter;
+    final String operation;
     final String cby;
     final String customerType;
+    final String runcardNo;
+    final String empId;
 
     SplitRequest(
             String workOrder,
@@ -19,6 +22,7 @@ final class SplitRequest {
             int splitQty,
             int motherQty,
             String workCenter,
+            String operation,
             String cby,
             String customerType
     ) {
@@ -29,7 +33,10 @@ final class SplitRequest {
         this.splitQty = splitQty;
         this.motherQty = motherQty;
         this.workCenter = workCenter;
+        this.operation = operation;
         this.cby = cby;
         this.customerType = customerType;
+        this.runcardNo = motherRuncard;
+        this.empId = cby;
     }
 }

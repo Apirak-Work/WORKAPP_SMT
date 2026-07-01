@@ -2,7 +2,7 @@ package com.example.smt;
 
 import java.util.List;
 
-final class ValidationResponse {
+public final class ValidationResponse {
     boolean isValid;
     List<String> errorMessages;
 }

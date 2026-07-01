@@ -1,6 +1,6 @@
 package com.example.smt;
 
-final class ProductionDetail {
+public final class ProductionDetail {
     final String runcardNo;
     final String description;
     final String material;

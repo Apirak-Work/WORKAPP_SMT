@@ -13,22 +13,41 @@ import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
 
+import com.example.smt.network.ProductionRetrofitApi;
+import com.example.smt.network.RetrofitProvider;
+
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Response;
 
+import java.util.ArrayList;
+import java.util.List;
+
 final class HoldFunctionManager {
     interface Callback {
         ProductionDetail getCurrentProductionDetail();
+
+        default String getCurrentWorkCenter() {
+            return "";
+        }
+
+        default String getCurrentOperation() {
+            return "";
+        }
+
+        default String getCurrentUserId() {
+            return "";
+        }
 
         void onOpenRequested();
 
         void onClosed();
 
         void onHoldActionSucceeded(String actionType);
+
+        void onInputChanged();
     }
 
-    private static final String[] HOLD_REASONS = {"Select Reason", "INT", "STOP", "MFG", "ENG"};
     private static final String[] HOLD_TOPICS_DEFAULT = {"Select Topic Damage"};
     private static final String[] HOLD_TOPICS_INT = {
             "Select Topic Damage",
@@ -122,7 +141,10 @@ final class HoldFunctionManager {
     private final Button closeButton;
     private final Button holdRuncardButton;
     private final Button releaseHoldRuncardButton;
+    private final List<HoldReason> holdReasons = new ArrayList<>();
+    private ArrayAdapter<String> reasonAdapter;
     private Call<ResponseBody> holdActionCall;
+    private Call<List<HoldReason>> holdReasonsCall;
 
     HoldFunctionManager(
             Context context,
@@ -169,12 +191,17 @@ final class HoldFunctionManager {
         rootView.setVisibility(View.VISIBLE);
         bindHeader(detail);
         resetInputs();
+        loadHoldReasons();
     }
 
     void close() {
         if (holdActionCall != null) {
             holdActionCall.cancel();
             holdActionCall = null;
+        }
+        if (holdReasonsCall != null) {
+            holdReasonsCall.cancel();
+            holdReasonsCall = null;
         }
         rootView.setVisibility(View.GONE);
         setStandardWorkflowVisible(true);
@@ -193,29 +220,34 @@ final class HoldFunctionManager {
     }
 
     private void configureSpinners() {
-        ArrayAdapter<String> reasonAdapter = new ArrayAdapter<>(
+        reasonAdapter = new ArrayAdapter<>(
                 context,
                 android.R.layout.simple_spinner_item,
-                HOLD_REASONS
+                new ArrayList<>()
         );
         reasonAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         reasonSpinner.setAdapter(reasonAdapter);
+        bindHoldReasons(new ArrayList<>());
         setTopicDamageOptions(HOLD_TOPICS_DEFAULT);
 
         reasonSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String reason = HOLD_REASONS[position];
-                if ("INT".equals(reason)) {
+                HoldReason selectedReason = selectedHoldReason();
+                String reasonText = selectedReason == null ? "" : selectedReason.label().toUpperCase();
+                if (reasonText.contains("INTERNAL") || reasonText.contains("INT")) {
                     setTopicDamageOptions(HOLD_TOPICS_INT);
-                } else if ("STOP".equals(reason)) {
+                } else if (reasonText.contains("IRR") || reasonText.contains("STOP")) {
                     setTopicDamageOptions(HOLD_TOPICS_STOP);
-                } else if ("MFG".equals(reason)) {
+                } else if (reasonText.contains("MFG") || reasonText.contains("QC") || reasonText.contains("YIELD")) {
                     setTopicDamageOptions(HOLD_TOPICS_MFG);
-                } else if ("ENG".equals(reason)) {
+                } else if (reasonText.contains("ENG")) {
                     setTopicDamageOptions(HOLD_TOPICS_ENG);
                 } else {
                     setTopicDamageOptions(HOLD_TOPICS_DEFAULT);
+                }
+                if (position > 0) {
+                    callback.onInputChanged();
                 }
             }
 
@@ -226,6 +258,50 @@ final class HoldFunctionManager {
         });
     }
 
+    private void loadHoldReasons() {
+        if (holdReasonsCall != null) {
+            holdReasonsCall.cancel();
+        }
+        holdReasonsCall = api.getHoldReasons();
+        holdReasonsCall.enqueue(new retrofit2.Callback<List<HoldReason>>() {
+            @Override
+            public void onResponse(Call<List<HoldReason>> call, Response<List<HoldReason>> response) {
+                holdReasonsCall = null;
+                if (!response.isSuccessful() || response.body() == null) {
+                    bindHoldReasons(new ArrayList<>());
+                    Toast.makeText(context, "Unable to load HOLD reasons", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                bindHoldReasons(response.body());
+            }
+
+            @Override
+            public void onFailure(Call<List<HoldReason>> call, Throwable throwable) {
+                if (call.isCanceled()) {
+                    return;
+                }
+                holdReasonsCall = null;
+                bindHoldReasons(new ArrayList<>());
+                Toast.makeText(context, "Unable to load HOLD reasons", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void bindHoldReasons(List<HoldReason> rows) {
+        holdReasons.clear();
+        reasonAdapter.clear();
+        reasonAdapter.add("Select Reason");
+        for (HoldReason row : rows) {
+            if (row == null || TextUtils.isEmpty(row.reasonCode)) {
+                continue;
+            }
+            holdReasons.add(row);
+            reasonAdapter.add(row.label());
+        }
+        reasonAdapter.notifyDataSetChanged();
+        reasonSpinner.setSelection(0);
+    }
+
     private void setTopicDamageOptions(String[] options) {
         ArrayAdapter<String> topicAdapter = new ArrayAdapter<>(
                 context,
@@ -234,6 +310,19 @@ final class HoldFunctionManager {
         );
         topicAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         topicDamageSpinner.setAdapter(topicAdapter);
+        topicDamageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position > 0) {
+                    callback.onInputChanged();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // No action is needed when no topic is selected.
+            }
+        });
     }
 
     private void bindHeader(ProductionDetail detail) {
@@ -255,15 +344,16 @@ final class HoldFunctionManager {
             Toast.makeText(context, "Runcard is not loaded yet", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!validateAllInputs()) {
+        if (!validateHoldInputs()) {
             return;
         }
 
+        HoldReason selectedReason = selectedHoldReason();
         executeHoldAction(
                 "HOLD",
                 detail,
                 holdComment.getText().toString().trim(),
-                reasonSpinner.getSelectedItem().toString(),
+                selectedReason == null ? "" : selectedReason.reasonCode,
                 topicDamageSpinner.getSelectedItem().toString()
         );
     }
@@ -274,14 +364,20 @@ final class HoldFunctionManager {
             Toast.makeText(context, "Runcard is not loaded yet", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!validateAllInputs()) {
+        if (!validateReleaseInputs()) {
             return;
         }
 
-        Toast.makeText(context, "Validation passed. Ready to call Release API.", Toast.LENGTH_SHORT).show();
+        executeHoldAction(
+                "RELEASE",
+                detail,
+                releaseHoldComment.getText().toString().trim(),
+                "",
+                ""
+        );
     }
 
-    private boolean validateAllInputs() {
+    private boolean validateHoldInputs() {
         if (TextUtils.isEmpty(holdComment.getText().toString().trim())) {
             holdComment.setError("Required");
             holdComment.requestFocus();
@@ -295,6 +391,10 @@ final class HoldFunctionManager {
             Toast.makeText(context, "Please select type of damage", Toast.LENGTH_SHORT).show();
             return false;
         }
+        return true;
+    }
+
+    private boolean validateReleaseInputs() {
         if (TextUtils.isEmpty(releaseHoldComment.getText().toString().trim())) {
             releaseHoldComment.setError("Required");
             releaseHoldComment.requestFocus();
@@ -318,6 +418,9 @@ final class HoldFunctionManager {
                 displayOrDash(detail.workOrder),
                 displayOrDash(detail.runcardNo),
                 displayOrDash(detail.material),
+                displayOrDash(callback.getCurrentWorkCenter()),
+                displayOrDash(callback.getCurrentOperation()),
+                displayOrDash(callback.getCurrentUserId()),
                 reason,
                 topicDamage,
                 "HOLD".equals(actionType) ? comment : "",
@@ -328,7 +431,9 @@ final class HoldFunctionManager {
         if (holdActionCall != null) {
             holdActionCall.cancel();
         }
-        holdActionCall = api.saveHoldAction(request);
+        holdActionCall = "RELEASE".equals(actionType)
+                ? api.releaseHoldAction(request)
+                : api.saveHoldAction(request);
         holdActionCall.enqueue(new retrofit2.Callback<ResponseBody>() {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
@@ -366,6 +471,14 @@ final class HoldFunctionManager {
                 ).show();
             }
         });
+    }
+
+    private HoldReason selectedHoldReason() {
+        int selectedIndex = reasonSpinner.getSelectedItemPosition() - 1;
+        if (selectedIndex < 0 || selectedIndex >= holdReasons.size()) {
+            return null;
+        }
+        return holdReasons.get(selectedIndex);
     }
 
     private void setActionButtonsEnabled(boolean enabled) {

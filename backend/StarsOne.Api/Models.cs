@@ -12,6 +12,11 @@ public sealed record ValidateScanResponse(
     bool MachineValid,
     bool RuncardValid);
 
+public sealed record EmployeeProfileResponse(
+    string EmpId,
+    string EmpName,
+    string Position);
+
 public sealed record ValidationResponse(
     bool IsValid,
     List<string> ErrorMessages);
@@ -61,6 +66,8 @@ public sealed record SaveProductionRequest(
     string RuncardNo,
     int GoodQty,
     int ScrapQty,
+    string? WorkCenter,
+    string? Operation,
     string? FunctionMode,
     DateTimeOffset StartDate,
     DateTimeOffset FinishDate,
@@ -70,10 +77,46 @@ public sealed record SaveProductionResponse(
     bool Success,
     string Message);
 
+public sealed record RejectDetailItem(
+    string ReasonCode,
+    string ReasonDesc,
+    int RejectQty);
+
+public sealed record SaveRejectRequest(
+    string? WorkOrder,
+    string? Runcard,
+    string? WcNo,
+    string? Operation,
+    string? Station,
+    string? Cby,
+    List<RejectDetailItem>? Rejects,
+    string? Wo,
+    string? RuncardNo,
+    int? RejectQty,
+    string? ReasonCode,
+    string? ReasonDesc,
+    string? EmpId);
+
+public sealed record SaveRejectResponse(
+    bool Success,
+    string Message);
+
+public sealed record RejectReasonDto(
+    string? ReasonCode,
+    string? Description,
+    string? ReasonGroup);
+
+public sealed record HoldReasonDto(
+    string? ReasonCode,
+    string? Description);
+
 public sealed record HoldRequest(
     string WorkOrder,
     string Runcard,
     string? Material,
+    string? WorkCenter,
+    string? Operation,
+    string? Cby,
     string? SelectReason,
     string? TopicDamage,
     string? HoldComment,
@@ -85,15 +128,18 @@ public sealed record HoldResponse(
     string Message);
 
 public sealed record SplitRequest(
-    string WorkOrder,
+    string? WorkOrder,
     string? Material,
-    string MotherRuncard,
-    string MotherAssyLot,
+    string? MotherRuncard,
+    string? MotherAssyLot,
     int SplitQty,
     int MotherQty,
     string? WorkCenter,
+    string? Operation,
     string? Cby,
-    string? CustomerType);
+    string? CustomerType,
+    string? RuncardNo,
+    string? EmpId);
 
 public sealed record SplitResponse(
     bool Success,
@@ -106,10 +152,16 @@ public sealed record SplitResponse(
     DateTimeOffset Cdate);
 
 public sealed record MergeRequest(
-    string MainRuncard,
-    List<string> SourceRuncards,
+    string? MainRuncard,
+    List<string>? SourceRuncards,
     string? WorkCenter,
-    string? Cby);
+    string? Operation,
+    string? Cby,
+    List<string>? MergedRuncards,
+    string? EmpId,
+    // MERGE = return split child lots back into their original mother.
+    // Preferred payload field; SourceRuncards/MergedRuncards are still accepted for back-compat.
+    List<string>? ChildRuncards = null);
 
 public sealed record MergeResponse(
     bool Success,

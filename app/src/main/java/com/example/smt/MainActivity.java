@@ -1,11 +1,11 @@
 package com.example.smt;
 
-import android.app.AlertDialog;
 import android.content.res.ColorStateList;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
@@ -19,21 +19,27 @@ import android.text.Editable;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.smt.network.ProductionRetrofitApi;
+import com.example.smt.network.RetrofitProvider;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
@@ -68,8 +74,12 @@ public class MainActivity extends AppCompatActivity {
     private EditText userIdInput;
     private EditText machineInput;
     private EditText runcardInput;
+    private TextView tvVerifyError;
+    private TextView tvMainAppVersion;
+    private View layoutBottomBranding;
     private LinearLayout miniHeader;
     private TextView miniHeaderUserValue;
+    private ImageButton miniHeaderUserInfoButton;
     private TextView miniHeaderMachineValue;
     private TextView miniHeaderRuncardValue;
     private TextView descriptionValue;
@@ -103,7 +113,9 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar checkRuncardProgress;
     private LinearLayout productionPanel;
     private Button verifyButton;
+    private Button returnScanButton;
     private Button saveButton;
+    private View layoutActionButtons;
     private ProgressBar saveProgressBar;
     private Button checkRuncardButton;
     private Button closeCheckRuncardButton;
@@ -129,6 +141,9 @@ public class MainActivity extends AppCompatActivity {
     private MergeManager mergeManager;
     private ScrapRejectManager scrapRejectManager;
     private boolean updatingGoodQtyFromScrap;
+    private boolean suppressProductionInputDirtyTracking;
+    // Tracks operator edits that have not been committed through SAVE CONFIRM.
+    private boolean hasUnsavedChanges;
     private boolean operTrackingExpanded = true;
     private boolean wasProductionVisible;
     private String lastCustomAlertMessage = "";
@@ -146,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         bindViews();
+        tvMainAppVersion.setText("v" + BuildConfig.VERSION_NAME);
         preventInitialKeyboard();
         viewModel = new ViewModelProvider(this).get(ScanViewModel.class);
         viewModel.getUiState().observe(this, this::render);
@@ -172,7 +188,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            View focusedView = getCurrentFocus();
+            if (focusedView instanceof EditText) {
+                Rect editTextBounds = new Rect();
+                focusedView.getGlobalVisibleRect(editTextBounds);
+                int touchX = Math.round(event.getRawX());
+                int touchY = Math.round(event.getRawY());
+
+                if (!editTextBounds.contains(touchX, touchY)) {
+                    focusedView.clearFocus();
+                    InputMethodManager inputMethodManager =
+                            (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (inputMethodManager != null) {
+                        inputMethodManager.hideSoftInputFromWindow(focusedView.getWindowToken(), 0);
+                    }
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (!isScanFieldFocused() && isEditableInputFocused()) {
+            return super.dispatchKeyEvent(event);
+        }
+
         if (event.getAction() == KeyEvent.ACTION_MULTIPLE && event.getCharacters() != null) {
             injectScannedValue(event.getCharacters());
             return true;
@@ -190,11 +233,14 @@ public class MainActivity extends AppCompatActivity {
                 submitFocusedScanField();
                 return true;
             }
+            if (isEditableInputFocused()) {
+                return super.dispatchKeyEvent(event);
+            }
             submitBufferedScan();
             return true;
         }
 
-        if (isScanFieldFocused() || isQtyInputFocused()) {
+        if (isScanFieldFocused() || isEditableInputFocused()) {
             return super.dispatchKeyEvent(event);
         }
 
@@ -211,8 +257,12 @@ public class MainActivity extends AppCompatActivity {
         userIdInput = findViewById(R.id.userIdInput);
         machineInput = findViewById(R.id.machineInput);
         runcardInput = findViewById(R.id.runcardInput);
+        tvVerifyError = findViewById(R.id.tv_verify_error);
+        tvMainAppVersion = findViewById(R.id.tv_main_app_version);
+        layoutBottomBranding = findViewById(R.id.layout_bottom_branding);
         miniHeader = findViewById(R.id.miniHeader);
         miniHeaderUserValue = findViewById(R.id.miniHeaderUserValue);
+        miniHeaderUserInfoButton = findViewById(R.id.miniHeaderUserInfoButton);
         miniHeaderMachineValue = findViewById(R.id.miniHeaderMachineValue);
         miniHeaderRuncardValue = findViewById(R.id.miniHeaderRuncardValue);
         descriptionValue = findViewById(R.id.descriptionValue);
@@ -246,7 +296,9 @@ public class MainActivity extends AppCompatActivity {
         checkRuncardProgress = findViewById(R.id.checkRuncardProgress);
         productionPanel = findViewById(R.id.productionPanel);
         verifyButton = findViewById(R.id.verifyButton);
+        returnScanButton = findViewById(R.id.btn_return_scan);
         saveButton = findViewById(R.id.saveButton);
+        layoutActionButtons = findViewById(R.id.layout_action_buttons);
         saveProgressBar = findViewById(R.id.saveProgressBar);
         checkRuncardButton = findViewById(R.id.checkRuncardButton);
         closeCheckRuncardButton = findViewById(R.id.closeCheckRuncardButton);
@@ -285,6 +337,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void wireActions() {
         verifyButton.setOnClickListener(v -> viewModel.verifyAndProceed());
+        miniHeaderUserInfoButton.setOnClickListener(v -> showCurrentUserInfoDialog());
+        returnScanButton.setOnClickListener(v -> showReturnToScanConfirmationDialog());
         saveButton.setOnClickListener(v -> viewModel.requestSave());
         operTrackingToggle.setOnClickListener(v -> toggleOperTrackingTable());
         scrapQtyInput.setOnClickListener(v -> rejectButton.performClick());
@@ -313,13 +367,17 @@ public class MainActivity extends AppCompatActivity {
         goodQtyInput.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(android.text.Editable editable) {
+                // Mark manual quantity edits as unsaved until SAVE CONFIRM succeeds.
                 viewModel.setGoodQty(editable.toString());
+                markUnsavedChange();
             }
         });
         scrapQtyInput.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(android.text.Editable editable) {
+                // Scrap changes affect the production totals and must be protected.
                 viewModel.setScrapQty(editable.toString());
+                markUnsavedChange();
                 if (!updatingGoodQtyFromScrap) {
                     autoCalculateGoodQtyFromScrap();
                 }
@@ -337,6 +395,26 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public ProductionDetail getCurrentProductionDetail() {
                         return currentProductionDetail();
+                    }
+
+                    @Override
+                    public String getCurrentWorkCenter() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.wc);
+                    }
+
+                    @Override
+                    public String getCurrentOperation() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.oper);
+                    }
+
+                    @Override
+                    public String getCurrentUserId() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        return state == null ? "" : state.userId;
                     }
 
                     @Override
@@ -366,6 +444,11 @@ public class MainActivity extends AppCompatActivity {
                             viewModel.switchRuncardAndVerify(detail.runcardNo);
                         }
                     }
+
+                    @Override
+                    public void onInputChanged() {
+                        markUnsavedChange();
+                    }
                 }
         );
         holdFunctionManager.initialize();
@@ -382,6 +465,32 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public ProductionDetail getCurrentProductionDetail() {
                         return currentProductionDetail();
+                    }
+
+                    @Override
+                    public String getCurrentWorkCenter() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.wc);
+                    }
+
+                    @Override
+                    public String getCurrentOperation() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.oper);
+                    }
+
+                    @Override
+                    public String getCurrentUserId() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        return state == null ? "" : state.userId;
+                    }
+
+                    @Override
+                    public String getCurrentStation() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        return state == null ? "" : state.machineId;
                     }
 
                     @Override
@@ -408,6 +517,13 @@ public class MainActivity extends AppCompatActivity {
                     public void onRejectTotalChanged(String totalQty) {
                         setTextIfDifferent(scrapQtyInput, totalQty);
                     }
+
+                    @Override
+                    public void onRejectSaved(String runcardNo) {
+                        if (!TextUtils.isEmpty(runcardNo)) {
+                            viewModel.switchRuncardAndVerify(runcardNo);
+                        }
+                    }
                 }
         );
         scrapRejectManager.initialize();
@@ -428,6 +544,13 @@ public class MainActivity extends AppCompatActivity {
                         ScanViewModel.UiState state = viewModel.getUiState().getValue();
                         OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
                         return activeRow == null ? "" : displayOrDash(activeRow.wc);
+                    }
+
+                    @Override
+                    public String getCurrentOperation() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.oper);
                     }
 
                     @Override
@@ -458,7 +581,13 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onSplitSucceeded(String newRuncard) {
-                        if (!TextUtils.isEmpty(newRuncard)) {
+                        // Refresh to the mother runcard so the dashboard shows its new reduced QTY.
+                        // The mother keeps the same RUNCARD (re-cloned with reduced qty); `newRuncard` is the child.
+                        ProductionDetail motherDetail = currentProductionDetail();
+                        String motherRuncard = motherDetail == null ? null : motherDetail.runcardNo;
+                        if (!TextUtils.isEmpty(motherRuncard)) {
+                            viewModel.switchRuncardAndVerify(motherRuncard);
+                        } else if (!TextUtils.isEmpty(newRuncard)) {
                             viewModel.switchRuncardAndVerify(newRuncard);
                         }
                     }
@@ -481,6 +610,13 @@ public class MainActivity extends AppCompatActivity {
                         ScanViewModel.UiState state = viewModel.getUiState().getValue();
                         OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
                         return activeRow == null ? "" : displayOrDash(activeRow.wc);
+                    }
+
+                    @Override
+                    public String getCurrentOperation() {
+                        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+                        OperTrackingRow activeRow = state == null ? null : activeOperRow(state);
+                        return activeRow == null ? "" : displayOrDash(activeRow.oper);
                     }
 
                     @Override
@@ -531,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
                 scrapQtyLabel,
                 scrapQtyInput,
                 timestampValue,
-                saveButton
+                layoutActionButtons
         };
     }
 
@@ -641,6 +777,7 @@ public class MainActivity extends AppCompatActivity {
         verifyButton.setVisibility(state.verifyVisible ? View.VISIBLE : View.GONE);
         verifyButton.setText(state.verifyButtonText);
         verifyButton.setEnabled(state.verifyEnabled);
+        renderVerifyError(state);
 
         renderMiniHeader(state);
         if (state.productionVisible && !wasProductionVisible) {
@@ -654,6 +791,7 @@ public class MainActivity extends AppCompatActivity {
 
         productionPanel.setVisibility(state.productionVisible ? View.VISIBLE : View.GONE);
         findViewById(R.id.scanPanel).setVisibility(state.productionVisible ? View.GONE : View.VISIBLE);
+        layoutBottomBranding.setVisibility(state.productionVisible ? View.GONE : View.VISIBLE);
         if (!state.productionVisible) {
             closeCheckRuncardByWorkOrder();
             if (holdFunctionManager != null && holdFunctionManager.isOpen()) {
@@ -684,7 +822,8 @@ public class MainActivity extends AppCompatActivity {
             saveButton.setText(state.saveButtonText);
             saveButton.setEnabled(state.saveEnabled);
         }
-        if (state.saveLoading || !isSaveErrorMessage(state.scannerMessage)) {
+        if ((state.saveLoading || !isSaveErrorMessage(state.scannerMessage))
+                && !TextUtils.equals(state.productionDataError, "User not found")) {
             lastCustomAlertMessage = "";
         }
 
@@ -701,7 +840,13 @@ public class MainActivity extends AppCompatActivity {
         if (state.accessDeniedEvent) {
             showAccessDeniedDialog();
             viewModel.consumeDialogEvents();
+        } else if (TextUtils.equals(state.productionDataError, "User not found")
+                && !TextUtils.equals(lastCustomAlertMessage, state.productionDataError)) {
+            lastCustomAlertMessage = state.productionDataError;
+            showCustomAlertDialog("User not found", "The scanned Employee ID was not found in the employee database.", false);
         } else if (state.saveCompleteEvent) {
+            // A successful save means there are no local edits left to protect.
+            hasUnsavedChanges = false;
             showCustomAlertDialog("Success", "Production Confirmed", true);
             viewModel.consumeDialogEvents();
         } else if (isSaveErrorMessage(state.scannerMessage)
@@ -762,6 +907,96 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void showCurrentUserInfoDialog() {
+        ScanViewModel.UiState state = viewModel.getUiState().getValue();
+        if (state == null || !state.productionVisible) {
+            return;
+        }
+
+        String name = TextUtils.isEmpty(state.employeeName) ? "-" : state.employeeName;
+        String position = TextUtils.isEmpty(state.employeePosition) ? "-" : state.employeePosition;
+        View dialogView = getLayoutInflater().inflate(R.layout.layout_dialog_user_info, null);
+        TextView idValue = dialogView.findViewById(R.id.dialogUserIdValue);
+        TextView nameValue = dialogView.findViewById(R.id.dialogUserNameValue);
+        TextView positionValue = dialogView.findViewById(R.id.dialogUserPositionValue);
+        Button closeButton = dialogView.findViewById(R.id.dialogUserCloseButton);
+
+        idValue.setText(displayOrDash(state.userId));
+        nameValue.setText(name);
+        positionValue.setText(position);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+        closeButton.setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
+    }
+
+    private void showReturnToScanConfirmationDialog() {
+        // Use a stronger warning only when the operator has unsaved local edits.
+        String title = hasUnsavedChanges ? "Unsaved Changes!" : "Return to Scan";
+        String message = hasUnsavedChanges
+                ? "You have unsaved data. Are you sure you want to discard them and return to the scan screen?"
+                : "Do you want to return to the initial scan screen?";
+        String positiveText = hasUnsavedChanges ? "Discard & Return" : "Confirm";
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(positiveText, (dialogInterface, which) -> resetToInitialState())
+                .setNegativeButton("Cancel", (dialogInterface, which) -> dialogInterface.dismiss())
+                .create();
+        dialog.setOnShowListener(shownDialog -> {
+            if (hasUnsavedChanges) {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                        .setTextColor(ContextCompat.getColor(this, R.color.danger));
+            }
+        });
+        dialog.show();
+    }
+
+    private void resetToInitialState() {
+        // Reset the source-of-truth state first, then clear visible fields and panels.
+        hideKeyboard();
+        suppressProductionInputDirtyTracking = true;
+        viewModel.resetToInitialState();
+        setTextIfDifferent(userIdInput, "");
+        setTextIfDifferent(machineInput, "");
+        setTextIfDifferent(runcardInput, "");
+        setTextIfDifferent(goodQtyInput, "");
+        setTextIfDifferent(scrapQtyInput, "");
+        suppressProductionInputDirtyTracking = false;
+        hasUnsavedChanges = false;
+        tvVerifyError.setVisibility(View.GONE);
+        tvVerifyError.setText("");
+        productionPanel.setVisibility(View.GONE);
+        findViewById(R.id.scanPanel).setVisibility(View.VISIBLE);
+        layoutBottomBranding.setVisibility(View.VISIBLE);
+        closeCheckRuncardByWorkOrder();
+        if (holdFunctionManager != null && holdFunctionManager.isOpen()) {
+            holdFunctionManager.close();
+        }
+        if (splitMergeManager != null && splitMergeManager.isOpen()) {
+            splitMergeManager.closeSplit();
+        }
+        if (mergeManager != null && mergeManager.isOpen()) {
+            mergeManager.close();
+        }
+        if (scrapRejectManager != null && scrapRejectManager.isOpen()) {
+            scrapRejectManager.close();
+        }
+        setActiveFunctionButton(null);
+        userIdInput.requestFocus();
+    }
+
+    private void markUnsavedChange() {
+        // Ignore programmatic updates and only protect edits made while production data is visible.
+        if (suppressProductionInputDirtyTracking || productionPanel.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        hasUnsavedChanges = true;
+    }
+
     private boolean isSaveErrorMessage(String message) {
         return !TextUtils.isEmpty(message)
                 && (message.startsWith("Save failed")
@@ -788,6 +1023,20 @@ public class MainActivity extends AppCompatActivity {
         miniHeaderUserValue.setText("USER: " + displayOrDash(state.userId));
         miniHeaderMachineValue.setText("MC: " + displayOrDash(state.machineId));
         miniHeaderRuncardValue.setText("RC: " + displayOrDash(state.runcard));
+        if (miniHeaderUserInfoButton != null) {
+            miniHeaderUserInfoButton.setEnabled(state.productionVisible);
+            miniHeaderUserInfoButton.setAlpha(state.productionVisible ? 1f : 0.35f);
+        }
+    }
+
+    private void renderVerifyError(ScanViewModel.UiState state) {
+        if (TextUtils.isEmpty(state.productionDataError) || state.productionVisible || state.productionDataLoading) {
+            tvVerifyError.setVisibility(View.GONE);
+            tvVerifyError.setText("");
+            return;
+        }
+        tvVerifyError.setText("Error: " + state.productionDataError);
+        tvVerifyError.setVisibility(View.VISIBLE);
     }
 
     private void toggleOperTrackingTable() {
@@ -872,7 +1121,9 @@ public class MainActivity extends AppCompatActivity {
         int scrapQty = parseQtyOrZero(scrapQtyInput.getText().toString());
         int goodQty = receiveQty - scrapQty;
         updatingGoodQtyFromScrap = true;
+        suppressProductionInputDirtyTracking = true;
         setTextIfDifferent(goodQtyInput, String.valueOf(goodQty));
+        suppressProductionInputDirtyTracking = false;
         updatingGoodQtyFromScrap = false;
     }
 
@@ -1074,8 +1325,8 @@ public class MainActivity extends AppCompatActivity {
         if (timestampValue != null) {
             timestampValue.setVisibility(standardVisibility);
         }
-        if (saveButton != null) {
-            saveButton.setVisibility(standardVisibility);
+        if (layoutActionButtons != null) {
+            layoutActionButtons.setVisibility(standardVisibility);
         }
     }
 
@@ -1384,8 +1635,9 @@ public class MainActivity extends AppCompatActivity {
         return userIdInput.hasFocus() || machineInput.hasFocus() || runcardInput.hasFocus();
     }
 
-    private boolean isQtyInputFocused() {
-        return goodQtyInput.hasFocus() || scrapQtyInput.hasFocus();
+    private boolean isEditableInputFocused() {
+        View focusedView = getCurrentFocus();
+        return focusedView instanceof EditText;
     }
 
     private String cleanScanValue(String value) {
@@ -1470,12 +1722,10 @@ public class MainActivity extends AppCompatActivity {
     private abstract static class SimpleTextWatcher implements android.text.TextWatcher {
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            // No-op.
         }
 
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
-            // No-op.
         }
     }
 }

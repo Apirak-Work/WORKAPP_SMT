@@ -14,7 +14,6 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,23 +28,23 @@ final class ProductionApiClient {
     }
 
     ProductionDetail getProductionDetail(String runcardNo) throws IOException, JSONException {
-        JSONObject json = new JSONObject(get("/api/production/runcards/" + urlSegment(runcardNo)));
+        JSONObject json = new JSONObject(get("/api/production/detail/" + urlSegment(runcardNo)));
         return new ProductionDetail(
-                opt(json, "runcardNo"),
+                runcardNo,
                 opt(json, "description"),
                 opt(json, "material"),
-                opt(json, "rcQuantity"),
-                opt(json, "qtyRc"),
-                opt(json, "qtyWo"),
-                opt(json, "dateCode"),
-                opt(json, "workOrder"),
+                opt(json, "rc_quantity"),
+                opt(json, "qty_rc"),
+                opt(json, "qty_wo"),
+                opt(json, "date_code"),
+                opt(json, "work_order"),
                 opt(json, "mpq"),
-                opt(json, "assyLot"),
+                opt(json, "assy_lot"),
                 opt(json, "waferLot"),
                 opt(json, "orderType"),
                 opt(json, "uom"),
-                opt(json, "lotType"),
-                opt(json, "reelNumber")
+                opt(json, "lot_type"),
+                opt(json, "reel_number")
         );
     }
 
@@ -87,27 +86,52 @@ final class ProductionApiClient {
         );
     }
 
+    EmployeeProfileResult verifyEmployee(String empId) throws IOException, JSONException {
+        JSONObject json = new JSONObject(get("/api/auth/verify/" + urlSegment(empId)));
+        return new EmployeeProfileResult(
+                opt(json, "empId"),
+                opt(json, "empName"),
+                opt(json, "position")
+        );
+    }
+
     SaveProductionResult saveProduction(
             String userId,
             String machineId,
             String runcardNo,
+            ProductionDetail detail,
+            OperTrackingRow activeRow,
             int goodQty,
             int scrapQty,
+            String workCenter,
+            String operation,
             long startDateMillis,
             long finishDateMillis,
             long postingDateMillis
     ) throws IOException, JSONException {
+        int receiveQty = goodQty + scrapQty;
+        double yieldTrig = receiveQty <= 0 ? 0.0 : (goodQty * 100.0) / receiveQty;
+        String material = detail == null ? "-" : fallback(detail.material, "-");
+        String materialDesc = detail == null ? "-" : fallback(detail.description, "-");
+        String workOrder = detail == null ? "-" : fallback(detail.workOrder, "-");
+        String workCenterText = activeRow == null ? "-" : fallback(activeRow.description, "-");
+
         JSONObject request = new JSONObject()
-                .put("userId", userId)
-                .put("machineId", machineId)
-                .put("runcardNo", runcardNo)
-                .put("goodQty", goodQty)
-                .put("scrapQty", scrapQty)
-                .put("functionMode", "MOBILE_CONFIRM")
-                .put("startDate", isoDate(startDateMillis))
-                .put("finishDate", isoDate(finishDateMillis))
-                .put("postingDate", isoDate(postingDateMillis));
-        JSONObject json = new JSONObject(post("/api/production/save", request, false));
+                .put("runcard_no", runcardNo)
+                .put("work_order", workOrder)
+                .put("routing_no", "-")
+                .put("material", material)
+                .put("material_desc", materialDesc)
+                .put("operation", fallback(operation, "-"))
+                .put("work_center", fallback(workCenter, "-"))
+                .put("work_center_text", workCenterText)
+                .put("receive_qty", receiveQty)
+                .put("good_qty", goodQty)
+                .put("scrap_qty", scrapQty)
+                .put("yield_trig", yieldTrig)
+                .put("user_id", userId)
+                .put("plant", "2300");
+        JSONObject json = new JSONObject(post("/api/production/confirm", request, false));
         return new SaveProductionResult(json.optBoolean("success", false), opt(json, "message"));
     }
 
@@ -210,6 +234,13 @@ final class ProductionApiClient {
         return json.optString(key, "");
     }
 
+    private static String fallback(String value, String fallback) {
+        if (value == null || value.trim().isEmpty() || value.trim().equals("-")) {
+            return fallback;
+        }
+        return value.trim();
+    }
+
     private static String trimTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
@@ -223,10 +254,6 @@ final class ProductionApiClient {
         } catch (UnsupportedEncodingException ignored) {
             return value.trim().replace(" ", "%20");
         }
-    }
-
-    private static String isoDate(long millis) {
-        return Instant.ofEpochMilli(millis).toString();
     }
 
     static final class ValidateScanResult {
@@ -248,6 +275,18 @@ final class ProductionApiClient {
             this.userValid = userValid;
             this.machineValid = machineValid;
             this.runcardValid = runcardValid;
+        }
+    }
+
+    static final class EmployeeProfileResult {
+        final String empId;
+        final String empName;
+        final String position;
+
+        EmployeeProfileResult(String empId, String empName, String position) {
+            this.empId = empId;
+            this.empName = empName;
+            this.position = position;
         }
     }
 

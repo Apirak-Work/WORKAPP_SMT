@@ -1,6 +1,6 @@
 package com.example.smt;
 
-final class SplitHistoryItem {
+public final class SplitHistoryItem {
     String runcard;
     String assyLot;
     Integer qty;

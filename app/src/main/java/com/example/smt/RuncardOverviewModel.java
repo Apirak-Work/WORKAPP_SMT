@@ -2,7 +2,7 @@ package com.example.smt;
 
 import com.google.gson.annotations.SerializedName;
 
-final class RuncardOverviewModel {
+public final class RuncardOverviewModel {
     @SerializedName(value = "type", alternate = {"Type", "rcType", "RcType", "RC_TYPE"})
     private String type;
 

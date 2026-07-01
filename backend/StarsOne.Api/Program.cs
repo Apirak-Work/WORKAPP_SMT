@@ -1,15 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using StarsOne.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<DbEnvOptions>(_ =>
+builder.Services.AddSingleton<DbEnvOptions>(serviceProvider =>
 {
+    var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
     var envPath = builder.Configuration["Database:EnvFilePath"] ?? @"C:\Users\apirak-mo\Desktop\Safe\db.env";
-    return DbEnvOptions.Load(envPath);
+    try
+    {
+        var options = DbEnvOptions.Load(envPath);
+        logger.LogInformation("[Startup] Loaded DB connection from env file '{EnvPath}' -> Host={Host}, Port={Port}, Database={Database}", envPath, options.Host, options.Port, options.Database);
+        return options;
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "[Startup] Failed to load DB env file '{EnvPath}'. Check the path and that the process has read permission.", envPath);
+        throw;
+    }
 });
-builder.Services.AddSingleton<SqlConnectionFactory>();
+builder.Services.AddSingleton<SqlConnectionFactory>(serviceProvider =>
+{
+    var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    var connectionString = configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        logger.LogInformation("[Startup] Using ConnectionStrings:DefaultConnection from appsettings.json/configuration.");
+        return new SqlConnectionFactory(connectionString);
+    }
+
+    logger.LogInformation("[Startup] ConnectionStrings:DefaultConnection is empty; falling back to DbEnvOptions (db.env).");
+    return new SqlConnectionFactory(serviceProvider.GetRequiredService<DbEnvOptions>());
+});
 builder.Services.AddSingleton<QueryCatalog>();
 builder.Services.AddScoped<ProductionRepository>();
 builder.Services.AddCors(options =>
@@ -41,6 +64,17 @@ app.MapPost("/api/workflow/validate-scan", async (
     return result.IsAllowed
         ? Results.Ok(result)
         : Results.BadRequest(result);
+});
+
+app.MapGet("/api/auth/verify/{empId}", async (
+    string empId,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var employee = await repository.VerifyEmployeeAsync(empId, cancellationToken);
+    return employee is null
+        ? Results.NotFound(new { message = "User not found." })
+        : Results.Ok(employee);
 });
 
 app.MapGet("/api/production/runcards/{runcardNo}", async (
@@ -104,6 +138,31 @@ app.MapPost("/api/production/save", async (
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
+app.MapGet("/api/production/reasons/hold", async (
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var reasons = await repository.GetHoldReasonsAsync(cancellationToken);
+    return Results.Ok(reasons);
+});
+
+app.MapGet("/api/production/reasons/reject", async (
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var reasons = await repository.GetRejectReasonsAsync(cancellationToken);
+    return Results.Ok(reasons);
+});
+
+app.MapPost("/api/production/hold", async (
+    [FromBody] HoldRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.SaveHoldActionAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 app.MapPost("/api/production/runcard/hold", async (
     [FromBody] HoldRequest request,
     ProductionRepository repository,
@@ -113,12 +172,48 @@ app.MapPost("/api/production/runcard/hold", async (
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
+app.MapPost("/api/production/release", async (
+    [FromBody] HoldRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.ReleaseHoldAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/reject", async (
+    [FromBody] SaveRejectRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.SaveRejectDetailsAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/split", async (
+    [FromBody] SplitRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.SplitRuncardAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 app.MapPost("/api/production/runcard/split", async (
     [FromBody] SplitRequest request,
     ProductionRepository repository,
     CancellationToken cancellationToken) =>
 {
     var result = await repository.SplitRuncardAsync(request, cancellationToken);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/production/merge", async (
+    [FromBody] MergeRequest request,
+    ProductionRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var result = await repository.MergeRuncardsAsync(request, cancellationToken);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
