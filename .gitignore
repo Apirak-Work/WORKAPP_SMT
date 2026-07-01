@@ -1,20 +1,29 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# === Android / Gradle / IDE ===
+.gradle/
+.idea/
+build/
+app/build/
 local.properties
-*.env
-*.local
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.iml
+
+# === Python / FastAPI ===
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.pytest_cache/
+.coverage
+
+# === อื่นๆ ===
 backend/**/bin/
 backend/**/obj/
 backend/**/appsettings.*.local.json
